@@ -1,0 +1,1172 @@
+use super::layout::decoration_top;
+use super::*;
+
+#[test]
+fn rejects_invalid_utf8_span_boundary() {
+    let mut system = System::default();
+    let mut builder = system.builder("é");
+    builder.span(Range::new(1, 2), Style::default());
+
+    let error = builder.build().expect_err("invalid range should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidRange);
+}
+
+#[test]
+fn rejects_invalid_utf8_inline_box_boundary() {
+    let mut system = System::default();
+    let mut builder = system.builder("é");
+    builder.inline_box(InlineBox::new(
+        Id::from_u64(1),
+        InlineBoxKind::InFlow,
+        1,
+        Size::new(4.0, 4.0),
+    ));
+
+    let error = builder
+        .build()
+        .expect_err("invalid inline box index should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidRange);
+}
+
+#[test]
+fn rejects_invalid_numeric_layout_options() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    builder.options(Options {
+        scale: f32::NAN,
+        ..Options::default()
+    });
+
+    let error = builder
+        .build()
+        .expect_err("invalid scale should fail before layout");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+}
+
+#[test]
+fn rejects_invalid_numeric_text_style() {
+    let mut system = System::default();
+    let style = Style {
+        size: 0.0,
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style);
+
+    let error = builder
+        .build()
+        .expect_err("invalid font size should fail before layout");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+    assert!(error.message.contains("font size"));
+}
+
+#[test]
+fn rejects_invalid_text_brush_channels() {
+    let mut system = System::default();
+    let style = Style {
+        brush: Brush::color(1.2, 0.0, 0.0, 1.0),
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style);
+
+    let error = builder
+        .build()
+        .expect_err("out-of-range brush channel should fail before layout");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+    assert!(error.message.contains("red channel"));
+}
+
+#[test]
+fn builds_plain_text_layout() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello world");
+    builder.options(Options {
+        width: Some(100.0),
+        ..Options::default()
+    });
+
+    let layout = builder.build().expect("layout should build");
+
+    assert_eq!(layout.metrics().line_count, 1);
+    assert!(!layout.glyph_runs().is_empty());
+}
+
+#[test]
+fn wrap_none_preserves_single_visual_line() {
+    let mut system = System::default();
+    let style = Style {
+        wrap: Wrap::None,
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello world");
+    builder.default_style(style).options(Options {
+        width: Some(16.0),
+        ..Options::default()
+    });
+
+    let layout = builder.build().expect("nowrap layout should build");
+
+    assert_eq!(layout.metrics().line_count, 1);
+    assert!(layout.metrics().overflow);
+}
+
+#[test]
+fn overflow_wrap_anywhere_breaks_unspaced_text() {
+    let mut system = System::default();
+    let mut normal = system.builder("abcdefghijklmnop");
+    normal.options(Options {
+        width: Some(32.0),
+        ..Options::default()
+    });
+    let normal = normal.build().expect("normal layout should build");
+    let style = Style {
+        overflow_wrap: OverflowWrap::Anywhere,
+        ..Style::default()
+    };
+    let mut anywhere = system.builder("abcdefghijklmnop");
+    anywhere.default_style(style).options(Options {
+        width: Some(32.0),
+        ..Options::default()
+    });
+
+    let anywhere = anywhere.build().expect("anywhere layout should build");
+
+    assert_eq!(normal.metrics().line_count, 1);
+    assert!(anywhere.metrics().line_count > 1);
+}
+
+#[test]
+fn passes_valid_locale_to_parley() {
+    let mut system = System::default();
+    let style = Style {
+        locale: Some("en-US".to_owned()),
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style);
+
+    let layout = builder.build().expect("valid locale should build");
+
+    assert_eq!(layout.metrics().line_count, 1);
+}
+
+#[test]
+fn rejects_invalid_locale() {
+    let mut system = System::default();
+    let style = Style {
+        locale: Some("not a locale".to_owned()),
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style);
+
+    let error = builder.build().expect_err("invalid locale should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+}
+
+#[test]
+fn passes_font_fallbacks_features_and_variations_to_parley() {
+    let mut system = System::default();
+    let style = Style {
+        font: Font::new()
+            .family("Arial")
+            .family("serif")
+            .feature(r#""liga" on"#)
+            .variation(r#""wght" 700"#),
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style);
+
+    let layout = builder.build().expect("valid font settings should build");
+
+    assert_eq!(layout.metrics().line_count, 1);
+}
+
+#[test]
+fn rejects_invalid_font_settings() {
+    let mut system = System::default();
+    let style = Style {
+        font: Font::new().feature("liga on"),
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style);
+
+    let error = builder
+        .build()
+        .expect_err("feature tags must use CSS OpenType setting syntax");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+
+    let mut system = System::default();
+    let style = Style {
+        font: Font::new().variation(r#""wght" nope"#),
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style);
+
+    let error = builder
+        .build()
+        .expect_err("variation values must use CSS OpenType setting syntax");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+}
+
+#[test]
+fn default_style_preserves_authored_whitespace() {
+    assert_eq!(Style::default().white_space, WhiteSpace::Preserve);
+}
+
+#[test]
+fn whitespace_collapse_reports_explicit_error() {
+    let mut system = System::default();
+    let style = Style {
+        white_space: WhiteSpace::Collapse,
+        ..Style::default()
+    };
+    let mut builder = system.builder("  hello\t\n world  ");
+    builder.default_style(style);
+
+    let error = builder
+        .build()
+        .expect_err("collapse must fail until source range projection is robust");
+
+    assert_eq!(error.code, ErrorCode::UnsupportedFeature);
+    assert!(error.message.contains("whitespace collapse"));
+}
+
+#[test]
+fn span_whitespace_collapse_reports_explicit_error() {
+    let mut system = System::default();
+    let collapsed = Style {
+        white_space: WhiteSpace::Collapse,
+        ..Style::default()
+    };
+    let mut builder = system.builder("pre  collapse\t\n  post");
+    builder.span(Range::new(3, 15), collapsed);
+
+    let error = builder
+        .build()
+        .expect_err("span-level collapse must fail until source range projection is robust");
+
+    assert_eq!(error.code, ErrorCode::UnsupportedFeature);
+    assert!(error.message.contains("whitespace collapse"));
+}
+
+#[test]
+fn default_indent_targets_first_line() {
+    assert!(Indent::default().first_line);
+}
+
+#[test]
+fn first_line_indent_offsets_first_line() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello\nworld");
+    builder.options(Options {
+        indent: Indent {
+            amount: 10.0,
+            ..Indent::default()
+        },
+        ..Options::default()
+    });
+
+    let layout = builder.build().expect("layout should build");
+    let first = layout.cursor(Cursor::new(0, Affinity::After));
+    let second = layout.cursor(Cursor::new(6, Affinity::After));
+
+    assert!(first.rect.origin.x >= 9.0);
+    assert!(second.rect.origin.x < 1.0);
+}
+
+#[test]
+fn first_line_false_without_other_scope_skips_indent() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    builder.options(Options {
+        indent: Indent {
+            amount: 10.0,
+            first_line: false,
+            each_line: false,
+            hanging: false,
+        },
+        ..Options::default()
+    });
+
+    let layout = builder.build().expect("layout should build");
+
+    assert!(layout.cursor(Cursor::new(0, Affinity::After)).rect.origin.x < 1.0);
+}
+
+#[test]
+fn rejects_each_line_indent_without_first_line_scope() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello\nworld");
+    builder.options(Options {
+        indent: Indent {
+            amount: 10.0,
+            first_line: false,
+            each_line: true,
+            hanging: false,
+        },
+        ..Options::default()
+    });
+
+    let error = builder
+        .build()
+        .expect_err("unsupported indent combination should fail");
+
+    assert_eq!(error.code, ErrorCode::UnsupportedFeature);
+}
+
+#[test]
+fn auto_direction_reports_resolved_base_direction() {
+    let mut system = System::default();
+    let mut builder = system.builder("שלום");
+
+    let layout = builder.build().expect("layout should build");
+
+    assert_eq!(layout.direction(), Direction::RightToLeft);
+}
+
+#[test]
+fn rejects_explicit_base_direction_until_parley_exposes_it() {
+    let mut system = System::default();
+    let style = Style {
+        direction: Direction::RightToLeft,
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style);
+
+    let error = builder
+        .build()
+        .expect_err("explicit direction should fail loudly");
+
+    assert_eq!(error.code, ErrorCode::UnsupportedFeature);
+}
+
+#[test]
+fn repeated_layout_uses_cache() {
+    let mut system = System::default();
+
+    let first = system
+        .builder("hello")
+        .build()
+        .expect("first layout should build");
+    let second = system
+        .builder("hello")
+        .build()
+        .expect("second layout should build from cache");
+
+    assert_eq!(first.key(), second.key());
+    assert_eq!(system.stats().layout_misses, 1);
+    assert_eq!(system.stats().layout_hits, 1);
+}
+
+#[test]
+fn source_identity_and_revision_participate_in_cache_key() {
+    let mut system = System::default();
+
+    let mut first = system.builder("hello");
+    first.identity(Id::from_u64(42), 1);
+    let first_layout = first.build().expect("first layout should build");
+
+    let mut second = system.builder("hello");
+    second.identity(Id::from_u64(42), 2);
+    let second_layout = second.build().expect("second layout should build");
+
+    assert_eq!(first_layout.key().source.id, Some(Id::from_u64(42)));
+    assert_eq!(first_layout.key().source.revision, 1);
+    assert_eq!(second_layout.key().source.id, Some(Id::from_u64(42)));
+    assert_eq!(second_layout.key().source.revision, 2);
+    assert_ne!(first_layout.key(), second_layout.key());
+    assert_eq!(system.stats().layout_misses, 2);
+    assert_eq!(system.stats().layout_hits, 0);
+}
+
+#[test]
+fn layout_preserves_authored_source_identity() {
+    let mut system = System::default();
+    let mut source = Source::identified("  hello  ", Id::from_u64(9), 7);
+    source.set_identity(Some(Id::from_u64(9)), 8);
+
+    let layout = system
+        .layout(source, Style::default(), Options::default())
+        .expect("layout should build");
+
+    assert_eq!(layout.source().id(), Some(Id::from_u64(9)));
+    assert_eq!(layout.source().revision(), 8);
+    assert_eq!(layout.source().text(), "  hello  ");
+}
+
+#[test]
+fn style_span_changes_cache_key() {
+    let mut system = System::default();
+    let mut first = system.builder("hello");
+    let first_style = Style {
+        underline: Decoration::solid(None),
+        ..Style::default()
+    };
+    first.span(Range::new(0, 5), first_style);
+    let first_layout = first.build().expect("first layout should build");
+
+    let mut second = system.builder("hello");
+    let second_style = Style {
+        strikethrough: Decoration::solid(None),
+        ..Style::default()
+    };
+    second.span(Range::new(0, 5), second_style);
+    let second_layout = second.build().expect("second layout should build");
+
+    assert_ne!(first_layout.key(), second_layout.key());
+    assert_eq!(system.stats().layout_misses, 2);
+    assert_eq!(system.stats().layout_hits, 0);
+}
+
+#[test]
+fn overlapping_spans_resolve_in_declaration_order() {
+    let mut system = System::default();
+    let first_brush = Brush::color(1.0, 0.0, 0.0, 1.0);
+    let second_brush = Brush::color(0.0, 0.0, 1.0, 1.0);
+    let first_style = Style {
+        brush: first_brush,
+        ..Style::default()
+    };
+    let second_style = Style {
+        brush: second_brush,
+        ..Style::default()
+    };
+    let mut builder = system.builder("abcd");
+    builder
+        .span(Range::new(0, 4), first_style)
+        .span(Range::new(1, 3), second_style);
+
+    let layout = builder.build().expect("layout should build");
+    let overlap_run = layout
+        .glyph_runs()
+        .into_iter()
+        .find(|run| {
+            run.glyphs
+                .iter()
+                .any(|glyph| glyph.range == Range::new(1, 2))
+        })
+        .expect("overlap glyph run should exist");
+
+    assert_eq!(overlap_run.brush, second_brush);
+    assert_eq!(overlap_run.style.brush, second_brush);
+}
+
+#[test]
+fn font_refresh_invalidates_cached_layouts() {
+    let mut system = System::default();
+    system
+        .builder("hello")
+        .build()
+        .expect("layout should build");
+
+    system.refresh_fonts().expect("font refresh should succeed");
+    system
+        .builder("hello")
+        .build()
+        .expect("layout after refresh should build");
+
+    assert_eq!(system.stats().font_refreshes, 1);
+    assert_eq!(system.stats().invalidations, 1);
+    assert_eq!(system.stats().layout_misses, 2);
+    assert_eq!(system.stats().layout_hits, 0);
+}
+
+#[test]
+fn selection_geometry_for_non_empty_range() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello world");
+    let layout = builder.build().expect("layout should build");
+
+    let selection = Selection::new(
+        Cursor::new(0, Affinity::After),
+        Cursor::new(5, Affinity::Before),
+    );
+
+    assert!(!layout.selection(selection).rects.is_empty());
+}
+
+#[test]
+fn selection_geometry_for_multi_line_range() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello world");
+    builder.options(Options {
+        width: Some(48.0),
+        ..Options::default()
+    });
+    let layout = builder.build().expect("layout should build");
+    let selection = Selection::new(
+        Cursor::new(0, Affinity::After),
+        Cursor::new(layout.source().text().len(), Affinity::Before),
+    );
+    let geometry = layout.selection(selection);
+
+    assert!(
+        geometry.rects.len() >= 2,
+        "wrapped selection should produce geometry on multiple lines"
+    );
+}
+
+#[test]
+fn cursor_geometry_for_empty_text() {
+    let mut system = System::default();
+    let mut builder = system.builder("");
+    let layout = builder.build().expect("empty layout should build");
+    let cursor = layout.cursor(Cursor::new(0, Affinity::After));
+
+    assert!(cursor.rect.size.height > 0.0);
+}
+
+#[test]
+fn cursor_geometry_for_bidi_boundary() {
+    let mut system = System::default();
+    let mut builder = system.builder("abc שלום def");
+    let layout = builder.build().expect("layout should build");
+    let before_rtl = layout.cursor(Cursor::new(4, Affinity::After));
+    let after_rtl = layout.cursor(Cursor::new("abc שלום".len(), Affinity::Before));
+
+    assert!(before_rtl.rect.size.height > 0.0);
+    assert!(after_rtl.rect.size.height > 0.0);
+    assert!(before_rtl.rect.origin.x.is_finite());
+    assert!(after_rtl.rect.origin.x.is_finite());
+}
+
+#[test]
+fn selection_geometry_for_bidi_range() {
+    let mut system = System::default();
+    let mut builder = system.builder("abc שלום def");
+    let layout = builder.build().expect("layout should build");
+    let selection = Selection::new(
+        Cursor::new(0, Affinity::After),
+        Cursor::new(layout.source().text().len(), Affinity::Before),
+    );
+    let geometry = layout.selection(selection);
+
+    assert!(!geometry.rects.is_empty());
+    assert!(
+        geometry
+            .rects
+            .iter()
+            .all(|rect| rect.rect.origin.x.is_finite() && rect.rect.size.width.is_finite())
+    );
+}
+
+#[test]
+fn inline_box_participates_in_layout() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello world");
+    builder.inline_box(InlineBox::new(
+        Id::from_u64(7),
+        InlineBoxKind::InFlow,
+        5,
+        Size::new(20.0, 10.0),
+    ));
+
+    let layout = builder.build().expect("layout should build");
+    let boxes = layout.inline_boxes();
+
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].id, Id::from_u64(7));
+}
+
+#[test]
+fn out_of_flow_inline_box_preserves_metrics_and_reports_anchor() {
+    let mut system = System::default();
+    let plain = system
+        .builder("hello world")
+        .build()
+        .expect("plain layout should build");
+    let plain_metrics = plain.metrics();
+    let mut builder = system.builder("hello world");
+    builder.inline_box(InlineBox::new(
+        Id::from_u64(8),
+        InlineBoxKind::OutOfFlow,
+        5,
+        Size::new(20.0, 10.0),
+    ));
+
+    let layout = builder.build().expect("layout should build");
+    let boxes = layout.inline_boxes();
+
+    assert_eq!(layout.metrics().size, plain_metrics.size);
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].id, Id::from_u64(8));
+    assert_eq!(boxes[0].kind, InlineBoxKind::OutOfFlow);
+    assert_eq!(boxes[0].index, 5);
+    assert_eq!(boxes[0].rect.size, Size::new(20.0, 10.0));
+}
+
+#[test]
+fn hit_detects_inline_box() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello world");
+    builder.inline_box(InlineBox::new(
+        Id::from_u64(7),
+        InlineBoxKind::InFlow,
+        5,
+        Size::new(20.0, 10.0),
+    ));
+    let layout = builder.build().expect("layout should build");
+    let box_rect = layout.inline_boxes()[0].rect;
+
+    assert_eq!(layout.hit(box_rect.origin), Hit::InlineBox(Id::from_u64(7)));
+}
+
+#[test]
+fn hit_detects_text_and_empty_space() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    let layout = builder.build().expect("layout should build");
+
+    assert!(matches!(layout.hit(Point::new(1.0, 1.0)), Hit::Text(_)));
+    assert_eq!(layout.hit(Point::new(-1.0, -1.0)), Hit::None);
+    assert_eq!(layout.hit(Point::new(10_000.0, 10_000.0)), Hit::None);
+}
+
+#[test]
+fn movement_handles_clusters() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    let layout = builder.build().expect("layout should build");
+
+    let moved = layout.move_cursor(Cursor::new(0, Affinity::After), Movement::NextCluster);
+
+    assert!(moved.index > 0);
+}
+
+#[test]
+fn glyphs_report_cluster_source_ranges() {
+    let mut system = System::default();
+    let mut builder = system.builder("ab");
+    let layout = builder.build().expect("layout should build");
+    let ranges = layout
+        .glyph_runs()
+        .into_iter()
+        .flat_map(|run| run.glyphs.into_iter().map(|glyph| glyph.range))
+        .collect::<Vec<_>>();
+
+    assert!(ranges.contains(&Range::new(0, 1)));
+    assert!(ranges.contains(&Range::new(1, 2)));
+}
+
+#[test]
+fn clusters_report_source_ranges_and_bounds() {
+    let mut system = System::default();
+    let mut builder = system.builder("ab");
+    let layout = builder.build().expect("layout should build");
+
+    let clusters = layout.clusters();
+
+    assert!(
+        clusters
+            .iter()
+            .any(|cluster| cluster.range == Range::new(0, 1))
+    );
+    assert!(
+        clusters
+            .iter()
+            .any(|cluster| cluster.range == Range::new(1, 2))
+    );
+    assert!(
+        clusters
+            .iter()
+            .all(|cluster| cluster.bounds.size.width >= 0.0)
+    );
+    assert!(
+        clusters
+            .iter()
+            .all(|cluster| cluster.bounds.size.height >= 0.0)
+    );
+}
+
+#[test]
+fn movement_handles_line_and_document_boundaries() {
+    let mut system = System::default();
+    let mut builder = system.builder("alpha\nbeta\ngamma");
+    let layout = builder.build().expect("layout should build");
+
+    assert_eq!(
+        layout.move_cursor(Cursor::new(8, Affinity::After), Movement::LineStart),
+        Cursor::new(6, Affinity::After)
+    );
+    assert_eq!(
+        layout.move_cursor(Cursor::new(8, Affinity::After), Movement::LineEnd),
+        Cursor::new(10, Affinity::Before)
+    );
+    assert_eq!(
+        layout.move_cursor(Cursor::new(8, Affinity::After), Movement::DocumentStart),
+        Cursor::new(0, Affinity::After)
+    );
+    assert_eq!(
+        layout.move_cursor(Cursor::new(8, Affinity::After), Movement::DocumentEnd),
+        Cursor::new("alpha\nbeta\ngamma".len(), Affinity::Before)
+    );
+}
+
+#[test]
+fn movement_handles_previous_and_next_line() {
+    let mut system = System::default();
+    let mut builder = system.builder("alpha\nbeta\ngamma");
+    let layout = builder.build().expect("layout should build");
+
+    let previous = layout.move_cursor(Cursor::new(8, Affinity::After), Movement::PreviousLine);
+    let next = layout.move_cursor(Cursor::new(8, Affinity::After), Movement::NextLine);
+
+    assert!(previous.index < 6);
+    assert!(next.index > 10);
+}
+
+#[test]
+fn movement_can_extend_selection() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    let layout = builder.build().expect("layout should build");
+    let selection = Selection::collapsed(Cursor::new(0, Affinity::After));
+
+    let extended = layout.move_selection(selection, Movement::NextCluster, true);
+
+    assert_eq!(extended.anchor, Cursor::new(0, Affinity::After));
+    assert!(extended.focus.index > extended.anchor.index);
+    assert!(!extended.is_collapsed());
+}
+
+#[test]
+fn movement_without_extend_collapses_selection() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    let layout = builder.build().expect("layout should build");
+    let selection = Selection::new(
+        Cursor::new(0, Affinity::After),
+        Cursor::new(5, Affinity::Before),
+    );
+
+    let moved = layout.move_selection(selection, Movement::PreviousCluster, false);
+
+    assert!(moved.is_collapsed());
+    assert!(moved.focus.index < 5);
+}
+
+#[test]
+fn edits_validate_ranges() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    let layout = builder.build().expect("layout should build");
+
+    let replaced = layout
+        .try_apply(Edit::Replace {
+            range: Range::new(1, 4),
+            text: "ipp".to_owned(),
+        })
+        .expect("valid replace should apply");
+    let deleted = layout
+        .try_apply(Edit::Delete {
+            range: Range::new(1, 4),
+        })
+        .expect("valid delete should apply");
+    let error = layout
+        .try_apply(Edit::Delete {
+            range: Range::new(1, 99),
+        })
+        .expect_err("invalid delete should fail");
+    let insert_error = layout
+        .try_apply(Edit::Insert {
+            index: 99,
+            text: "!".to_owned(),
+        })
+        .expect_err("invalid insert should fail");
+
+    assert_eq!(replaced.text(), "hippo");
+    assert_eq!(deleted.text(), "ho");
+    assert_eq!(error.code, ErrorCode::InvalidRange);
+    assert_eq!(insert_error.code, ErrorCode::InvalidRange);
+}
+
+#[test]
+fn edits_project_ranges_and_revision() {
+    let mut system = System::default();
+    let mut builder = system.builder("abcdef");
+    builder
+        .identity(Id::from_u64(3), 4)
+        .span(Range::new(2, 5), Style::default())
+        .inline_box(InlineBox::new(
+            Id::from_u64(9),
+            InlineBoxKind::OutOfFlow,
+            5,
+            Size::new(1.0, 1.0),
+        ));
+    let layout = builder.build().expect("layout should build");
+
+    let replaced = layout
+        .try_apply(Edit::Replace {
+            range: Range::new(1, 3),
+            text: "XXYY".to_owned(),
+        })
+        .expect("replace should apply");
+    let deleted = layout
+        .try_apply(Edit::Delete {
+            range: Range::new(1, 4),
+        })
+        .expect("delete should apply");
+    let inserted = layout
+        .try_apply(Edit::Insert {
+            index: 3,
+            text: "ZZ".to_owned(),
+        })
+        .expect("insert should apply");
+
+    assert_eq!(replaced.text(), "aXXYYdef");
+    assert_eq!(replaced.revision(), 5);
+    assert_eq!(replaced.spans()[0].range, Range::new(1, 7));
+    assert_eq!(replaced.boxes()[0].index, 7);
+    assert_eq!(deleted.text(), "aef");
+    assert_eq!(deleted.revision(), 5);
+    assert_eq!(deleted.spans()[0].range, Range::new(1, 2));
+    assert_eq!(deleted.boxes()[0].index, 2);
+    assert_eq!(inserted.text(), "abcZZdef");
+    assert_eq!(inserted.revision(), 5);
+    assert_eq!(inserted.spans()[0].range, Range::new(2, 7));
+    assert_eq!(inserted.boxes()[0].index, 7);
+}
+
+#[test]
+fn edit_insert_targets_source_index() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    builder.identity(Id::from_u64(5), 9);
+    let layout = builder.build().expect("layout should build");
+
+    let edited = layout
+        .try_apply(Edit::Insert {
+            index: 2,
+            text: "y".to_owned(),
+        })
+        .expect("insert should apply");
+
+    assert_eq!(edited.text(), "heyllo");
+    assert_eq!(edited.revision(), 10);
+}
+
+#[test]
+fn glyph_runs_preserve_resolved_brush() {
+    let mut system = System::default();
+    let brush = Brush::color(0.2, 0.4, 0.6, 1.0);
+    let decoration_brush = Brush::color(0.7, 0.2, 0.1, 1.0);
+    let style = Style {
+        size: 20.0,
+        brush,
+        underline: Decoration::solid(Some(decoration_brush)),
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style.clone());
+    let layout = builder.build().expect("layout should build");
+
+    assert!(
+        layout
+            .glyph_runs()
+            .iter()
+            .any(|run| run.brush == brush && run.style == style)
+    );
+}
+
+#[test]
+fn glyph_runs_expose_resolved_font_data() {
+    let mut system = System::default();
+    let mut builder = system.builder("effect text");
+    let layout = builder.build().expect("layout should build");
+    let runs = layout.glyph_runs();
+    let data = runs
+        .iter()
+        .find_map(|run| run.font.data())
+        .expect("glyph runs should expose resolved font data");
+
+    assert!(!data.bytes().is_empty());
+    assert_eq!(data.index(), 0);
+}
+
+#[test]
+fn composer_push_appends_text_and_returns_range() {
+    let mut composer = compose();
+
+    let first = composer.push("é");
+    let second = composer.push(" text");
+    let source = composer.finish();
+
+    assert_eq!(source.text(), "é text");
+    assert_eq!(first.range(), Range::new(0, 2));
+    assert_eq!(second.range(), Range::new(2, 7));
+}
+
+#[test]
+fn composer_source_matches_manual_source() {
+    let style = Style {
+        brush: Brush::color(1.0, 0.0, 0.0, 1.0),
+        ..Style::default()
+    };
+
+    let composed = source(|t| {
+        t.push("plain ");
+        t.with(style.clone(), |t| {
+            t.push("styled");
+        });
+    });
+
+    let mut manual = Source::new("");
+    manual.push("plain ");
+    let styled = manual.push("styled");
+    manual.span(styled, style);
+
+    assert_eq!(composed, manual);
+}
+
+#[test]
+fn composer_with_captures_only_text_added_inside_closure() {
+    let style = Style {
+        brush: Brush::color(0.0, 0.0, 1.0, 1.0),
+        ..Style::default()
+    };
+
+    let composed = source(|t| {
+        t.push("before ");
+        let mark = t.with(style.clone(), |t| {
+            t.push("inside");
+        });
+        t.push(" after");
+
+        assert_eq!(mark.range(), Range::new(7, 13));
+    });
+
+    assert_eq!(composed.text(), "before inside after");
+    assert_eq!(composed.spans(), &[Span::new(Range::new(7, 13), style)]);
+}
+
+#[test]
+fn composer_nested_with_orders_outer_before_inner() {
+    let outer = Style {
+        brush: Brush::color(1.0, 0.0, 0.0, 1.0),
+        ..Style::default()
+    };
+    let inner = Style {
+        brush: Brush::color(0.0, 0.0, 1.0, 1.0),
+        ..Style::default()
+    };
+
+    let composed = source(|t| {
+        t.with(outer.clone(), |t| {
+            t.push("a");
+            t.with(inner.clone(), |t| {
+                t.push("b");
+            });
+            t.push("c");
+        });
+    });
+
+    assert_eq!(composed.text(), "abc");
+    assert_eq!(
+        composed.spans(),
+        &[
+            Span::new(Range::new(0, 3), outer),
+            Span::new(Range::new(1, 2), inner),
+        ]
+    );
+}
+
+#[test]
+fn composer_with_can_produce_empty_mark() {
+    let style = Style::default();
+
+    let composed = source(|t| {
+        t.push("a");
+        let mark = t.with(style.clone(), |_t| {});
+
+        assert!(mark.is_empty());
+        assert_eq!(mark.range(), Range::new(1, 1));
+    });
+
+    assert_eq!(composed.spans(), &[Span::new(Range::new(1, 1), style)]);
+}
+
+#[test]
+fn composer_box_inserts_inline_box_at_current_end() {
+    let composed = source(|t| {
+        t.push("before");
+        t.box_(
+            Id::from_u64(7),
+            InlineBoxKind::InFlow,
+            Size::new(16.0, 20.0),
+        );
+        t.push("after");
+    });
+
+    assert_eq!(
+        composed.boxes(),
+        &[InlineBox::new(
+            Id::from_u64(7),
+            InlineBoxKind::InFlow,
+            6,
+            Size::new(16.0, 20.0)
+        )]
+    );
+}
+
+#[test]
+fn composer_try_span_rejects_invalid_ranges() {
+    let mut composer = compose();
+    composer.push("é");
+
+    let error = composer
+        .try_span(Range::new(1, 2), Style::default())
+        .expect_err("non-boundary range should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidRange);
+}
+
+#[test]
+fn composer_try_inline_box_rejects_invalid_indices() {
+    let mut composer = compose();
+    composer.push("é");
+
+    let error = composer
+        .try_inline_box(InlineBox::new(
+            Id::from_u64(1),
+            InlineBoxKind::OutOfFlow,
+            1,
+            Size::new(4.0, 4.0),
+        ))
+        .expect_err("non-boundary inline box index should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidRange);
+}
+
+#[test]
+fn composer_identity_and_revision_update_source_fields() {
+    let mut composer = compose();
+    composer.identity(Id::from_u64(42), 7).revision(8);
+    composer.push("hello");
+    let source = composer.finish();
+
+    assert_eq!(source.id(), Some(Id::from_u64(42)));
+    assert_eq!(source.revision(), 8);
+}
+
+#[test]
+fn composed_source_builds_through_layout_system() {
+    let mut system = System::default();
+    let source = source(|t| {
+        t.push("hello ");
+        t.with(Style::default(), |t| {
+            t.push("layout");
+        });
+    });
+
+    let layout = system
+        .layout(source, Style::default(), Options::default())
+        .expect("composed source should build");
+
+    assert_eq!(layout.metrics().line_count, 1);
+}
+
+#[cfg(feature = "text-render")]
+#[test]
+fn render_projection_encodes_prepared_glyph_runs() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    let layout = builder.build().expect("layout should build");
+    let mut scene = surgeist_render::Scene::new();
+
+    layout.push_render_text(&mut scene, surgeist_render::Transform::identity());
+
+    assert!(!scene.is_empty());
+}
+
+#[cfg(feature = "text-render")]
+#[test]
+fn render_projection_draws_prepared_glyph_runs() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    let layout = builder.build().expect("layout should build");
+    let mut scene = surgeist_render::Scene::new();
+
+    layout.push_render_text(&mut scene, surgeist_render::Transform::identity());
+
+    let mut renderer = pollster::block_on(surgeist_render::Renderer::new(
+        surgeist_render::Options::default(),
+    ))
+    .expect("renderer should initialize");
+    let mut surface = renderer
+        .create_headless(surgeist_render::Size::new(64.0, 32.0), 1.0)
+        .expect("headless surface should initialize");
+    let stats = renderer
+        .render(&mut surface, &scene, surgeist_render::Parameters::default())
+        .expect("prepared text should render with resolved font data");
+
+    assert!(stats.glyphs > 0);
+}
+
+#[cfg(feature = "text-render")]
+#[test]
+fn render_projection_encodes_decorations() {
+    let mut system = System::default();
+    let style = Style {
+        underline: Decoration::solid(Some(Brush::color(1.0, 0.0, 0.0, 1.0))),
+        ..Style::default()
+    };
+    let mut builder = system.builder("hello");
+    builder.default_style(style);
+    let layout = builder.build().expect("layout should build");
+    let mut scene = surgeist_render::Scene::new();
+
+    layout.push_render_text(&mut scene, surgeist_render::Transform::identity());
+
+    assert!(
+        scene.len() > layout.glyph_runs().len(),
+        "decoration fills should be encoded in addition to glyph runs"
+    );
+}
+
+#[test]
+fn decoration_offsets_are_measured_from_baseline() {
+    assert_eq!(decoration_top(20.0, 3.0), 17.0);
+}
+
+#[cfg(feature = "text-accessibility")]
+#[test]
+fn accessibility_projection_preserves_cursor_and_selection() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    let layout = builder.build().expect("layout should build");
+    let mut accessibility = Accessibility::default();
+    let parent = accesskit::NodeId(100);
+
+    let update = layout.accessibility_update(&mut accessibility, parent, parent, Point::default());
+    let position = layout
+        .access_position(&accessibility, Cursor::new(0, Affinity::After))
+        .expect("cursor should map to AccessKit");
+    let selection = layout
+        .access_selection(
+            &accessibility,
+            Selection::new(
+                Cursor::new(0, Affinity::After),
+                Cursor::new(5, Affinity::Before),
+            ),
+        )
+        .expect("selection should map to AccessKit");
+
+    assert!(update.nodes.iter().any(|(id, _)| *id == parent));
+    assert_eq!(position.character_index, 0);
+    assert_eq!(selection.anchor.character_index, 0);
+    assert!(selection.focus.character_index > 0);
+}
