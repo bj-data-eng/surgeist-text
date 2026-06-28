@@ -1,9 +1,30 @@
 use std::hash::{Hash, Hasher};
 
+use super::source_model::ValidatedSpan;
 use super::{
-    Brush, Decoration, Font, Id, Indent, InlineBox, LineHeight, Options, Size, Slant, Source, Span,
-    Style,
+    Brush, Decoration, Font, Id, Indent, InlineBox, LineHeight, Options, Size, Slant, Source,
+    SourceRevision, Style, ValidatedOptions, ValidatedSource, ValidatedStyle,
 };
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct FontGeneration(u64);
+
+impl FontGeneration {
+    #[must_use]
+    pub const fn initial() -> Self {
+        Self(0)
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn next(self) -> Self {
+        Self(self.0.saturating_add(1))
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Stats {
@@ -15,85 +36,126 @@ pub struct Stats {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Key {
-    pub source: SourceKey,
-    pub styles: StyleKey,
-    pub options: OptionsKey,
-    pub font_generation: u64,
+    source: SourceKey,
+    styles: StyleKey,
+    options: OptionsKey,
+    font_generation: FontGeneration,
     pub(crate) options_width: Option<OrderedF32>,
 }
 
 impl Key {
     #[must_use]
-    pub fn new(
-        source: SourceKey,
-        styles: StyleKey,
-        options: OptionsKey,
-        font_generation: u64,
+    pub fn from_validated(
+        source: &ValidatedSource,
+        style: &ValidatedStyle,
+        options: ValidatedOptions,
+        font_generation: FontGeneration,
     ) -> Self {
-        Self {
-            source,
-            styles,
-            options,
-            font_generation,
-            options_width: None,
-        }
-    }
-
-    pub(crate) fn from_parts(
-        source: &Source,
-        style: &Style,
-        options: Options,
-        font_generation: u64,
-    ) -> Self {
-        let source_key = SourceKey::new(source.id, source.revision, stable_hash_source(source));
-        let style_key = StyleKey::new(0, stable_hash_style(style, source.spans()));
-        let options_key = OptionsKey::new(stable_hash_options(options));
+        let identity = source.identity();
+        let authored_options = options.authored();
+        let source_key = SourceKey::new(
+            identity.id(),
+            identity.revision().get(),
+            stable_hash_source(source.source()),
+        );
+        let style_key = StyleKey::new(0, stable_hash_style(style.authored(), source.span_styles()));
+        let options_key = OptionsKey::new(stable_hash_options(authored_options));
         Self {
             source: source_key,
             styles: style_key,
             options: options_key,
             font_generation,
-            options_width: options.width.map(OrderedF32),
+            options_width: authored_options.width.map(OrderedF32),
         }
+    }
+
+    #[must_use]
+    pub const fn source(self) -> SourceKey {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn styles(self) -> StyleKey {
+        self.styles
+    }
+
+    #[must_use]
+    pub const fn options(self) -> OptionsKey {
+        self.options
+    }
+
+    #[must_use]
+    pub const fn font_generation(self) -> FontGeneration {
+        self.font_generation
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct SourceKey {
-    pub id: Option<Id>,
-    pub revision: u64,
-    pub hash: u64,
+    id: Option<Id>,
+    revision: u64,
+    hash: u64,
 }
 
 impl SourceKey {
     #[must_use]
-    pub const fn new(id: Option<Id>, revision: u64, hash: u64) -> Self {
+    pub(crate) const fn new(id: Option<Id>, revision: u64, hash: u64) -> Self {
         Self { id, revision, hash }
+    }
+
+    #[must_use]
+    pub const fn id(self) -> Option<Id> {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn revision(self) -> SourceRevision {
+        SourceRevision::new(self.revision)
+    }
+
+    #[must_use]
+    pub const fn hash(self) -> u64 {
+        self.hash
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct StyleKey {
-    pub revision: u64,
-    pub hash: u64,
+    revision: u64,
+    hash: u64,
 }
 
 impl StyleKey {
     #[must_use]
-    pub const fn new(revision: u64, hash: u64) -> Self {
+    pub(crate) const fn new(revision: u64, hash: u64) -> Self {
         Self { revision, hash }
+    }
+
+    #[must_use]
+    pub const fn revision(self) -> u64 {
+        self.revision
+    }
+
+    #[must_use]
+    pub const fn hash(self) -> u64 {
+        self.hash
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct OptionsKey {
-    pub hash: u64,
+    hash: u64,
 }
 
 impl OptionsKey {
     #[must_use]
-    pub const fn new(hash: u64) -> Self {
+    pub(crate) const fn new(hash: u64) -> Self {
         Self { hash }
+    }
+
+    #[must_use]
+    pub const fn hash(self) -> u64 {
+        self.hash
     }
 }
 
@@ -124,13 +186,13 @@ fn stable_hash_source(source: &Source) -> u64 {
     hasher.finish()
 }
 
-fn stable_hash_style(style: &Style, spans: &[Span]) -> u64 {
+fn stable_hash_style(style: &Style, spans: &[ValidatedSpan]) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     hash_style(style, &mut hasher);
     spans.len().hash(&mut hasher);
     for span in spans {
-        span.range.hash(&mut hasher);
-        hash_style(&span.style, &mut hasher);
+        span.range().hash(&mut hasher);
+        hash_style(span.style().authored(), &mut hasher);
     }
     hasher.finish()
 }

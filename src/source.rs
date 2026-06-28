@@ -1,4 +1,115 @@
-use super::{Id, Range, Size, SourcePosition, SourceRange, Style};
+use super::{Id, Range, Result, Size, SourcePosition, SourceRange, Style, ValidatedStyle, range};
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct SourceRevision(u64);
+
+impl SourceRevision {
+    #[must_use]
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn next(self) -> Self {
+        Self(self.0.saturating_add(1))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct SourceIdentity {
+    id: Option<Id>,
+    revision: SourceRevision,
+}
+
+impl SourceIdentity {
+    #[must_use]
+    pub const fn new(id: Option<Id>, revision: SourceRevision) -> Self {
+        Self { id, revision }
+    }
+
+    #[must_use]
+    pub const fn id(self) -> Option<Id> {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn revision(self) -> SourceRevision {
+        self.revision
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedSource {
+    source: Source,
+    span_styles: Vec<ValidatedSpan>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ValidatedSpan {
+    range: Range,
+    style: ValidatedStyle,
+}
+
+impl ValidatedSpan {
+    #[must_use]
+    pub(crate) const fn range(&self) -> Range {
+        self.range
+    }
+
+    #[must_use]
+    pub(crate) const fn style(&self) -> &ValidatedStyle {
+        &self.style
+    }
+}
+
+impl ValidatedSource {
+    #[must_use]
+    pub const fn source(&self) -> &Source {
+        &self.source
+    }
+
+    #[must_use]
+    pub const fn identity(&self) -> SourceIdentity {
+        SourceIdentity::new(self.source.id, SourceRevision::new(self.source.revision))
+    }
+
+    #[must_use]
+    pub(crate) fn span_styles(&self) -> &[ValidatedSpan] {
+        &self.span_styles
+    }
+}
+
+impl TryFrom<Source> for ValidatedSource {
+    type Error = super::Error;
+
+    fn try_from(source: Source) -> Result<Self> {
+        let span_styles = validate_source(&source)?;
+        Ok(Self {
+            source,
+            span_styles,
+        })
+    }
+}
+
+fn validate_source(source: &Source) -> Result<Vec<ValidatedSpan>> {
+    let mut span_styles = Vec::with_capacity(source.spans.len());
+    for span in &source.spans {
+        range::validate(source.text(), span.range)?;
+        span_styles.push(ValidatedSpan {
+            range: span.range,
+            style: ValidatedStyle::try_from(span.style.clone())?,
+        });
+    }
+    for box_ in &source.boxes {
+        range::validate_index(source.text(), box_.index, "inline box index")?;
+    }
+    Ok(span_styles)
+}
 
 /// Text source plus resolved style spans and inline boxes.
 #[derive(Clone, Debug, Default, PartialEq)]

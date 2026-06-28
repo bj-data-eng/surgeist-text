@@ -450,6 +450,50 @@ fn repeated_layout_uses_cache() {
 }
 
 #[test]
+fn validated_source_snapshot_rejects_invalid_boxes_before_cache_keying() {
+    let mut source = Source::new("é");
+    source.inline_box(InlineBox::new(
+        Id::from_u64(11),
+        InlineBoxKind::InFlow,
+        1,
+        Size::new(1.0, 1.0),
+    ));
+
+    let error = ValidatedSource::try_from(source).expect_err("invalid box anchor should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidRange);
+}
+
+#[test]
+fn validated_source_snapshot_rejects_invalid_span_styles_before_cache_keying() {
+    let mut source = Source::new("hello");
+    source.span(
+        Range::new(0, 5),
+        Style {
+            size: 0.0,
+            ..Style::default()
+        },
+    );
+
+    let error = ValidatedSource::try_from(source).expect_err("invalid span style should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+}
+
+#[test]
+fn cache_key_requires_normalized_parts() {
+    let source = ValidatedSource::try_from(Source::identified("hello", Id::from_u64(1), 2))
+        .expect("source validates");
+    let style = ValidatedStyle::try_from(Style::default()).expect("style validates");
+    let options = ValidatedOptions::try_from(Options::default()).expect("options validate");
+
+    let key = Key::from_validated(&source, &style, options, FontGeneration::initial());
+
+    assert_eq!(key.source().id(), Some(Id::from_u64(1)));
+    assert_eq!(key.source().revision().get(), 2);
+}
+
+#[test]
 fn source_identity_and_revision_participate_in_cache_key() {
     let mut system = System::default();
 
@@ -461,10 +505,10 @@ fn source_identity_and_revision_participate_in_cache_key() {
     second.identity(Id::from_u64(42), 2);
     let second_layout = second.build().expect("second layout should build");
 
-    assert_eq!(first_layout.key().source.id, Some(Id::from_u64(42)));
-    assert_eq!(first_layout.key().source.revision, 1);
-    assert_eq!(second_layout.key().source.id, Some(Id::from_u64(42)));
-    assert_eq!(second_layout.key().source.revision, 2);
+    assert_eq!(first_layout.key().source().id(), Some(Id::from_u64(42)));
+    assert_eq!(first_layout.key().source().revision().get(), 1);
+    assert_eq!(second_layout.key().source().id(), Some(Id::from_u64(42)));
+    assert_eq!(second_layout.key().source().revision().get(), 2);
     assert_ne!(first_layout.key(), second_layout.key());
     assert_eq!(system.stats().layout_misses, 2);
     assert_eq!(system.stats().layout_hits, 0);

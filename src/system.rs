@@ -6,8 +6,8 @@ use parley::{
 };
 
 use super::{
-    Brush, Id, InlineBox, Key, Layout, Options, Range, Result, Source, Span, Stats, Style,
-    ValidatedOptions, ValidatedStyle, range,
+    Brush, FontGeneration, Id, InlineBox, Key, Layout, Options, Range, Result, Source, Span, Stats,
+    Style, ValidatedOptions, ValidatedSource, ValidatedStyle,
 };
 
 /// Shared font and layout system.
@@ -15,7 +15,7 @@ pub struct System {
     font_context: FontContext,
     layout_context: LayoutContext<Brush>,
     cache: HashMap<Key, Layout>,
-    font_generation: u64,
+    font_generation: FontGeneration,
     stats: Stats,
 }
 
@@ -25,7 +25,7 @@ impl System {
             font_context: FontContext::new(),
             layout_context: LayoutContext::new(),
             cache: HashMap::new(),
-            font_generation: 0,
+            font_generation: FontGeneration::initial(),
             stats: Stats::default(),
         })
     }
@@ -50,7 +50,7 @@ impl System {
     }
 
     pub fn refresh_fonts(&mut self) -> Result<()> {
-        self.font_generation = self.font_generation.saturating_add(1);
+        self.font_generation = self.font_generation.next();
         self.stats.invalidations = self.stats.invalidations.saturating_add(self.cache.len());
         self.cache.clear();
         self.stats.font_refreshes = self.stats.font_refreshes.saturating_add(1);
@@ -107,21 +107,19 @@ impl Builder<'_> {
     }
 
     pub fn build(&mut self) -> Result<Layout> {
-        validate_source(&self.source)?;
+        let validated_source = ValidatedSource::try_from(self.source.clone())?;
         let validated_options = ValidatedOptions::try_from(self.options)?;
         let default_style = ValidatedStyle::try_from(self.default_style.clone())?;
-        let span_styles = self
-            .source
-            .spans
+        let span_styles = validated_source
+            .span_styles()
             .iter()
-            .map(|span| Ok((span.range, ValidatedStyle::try_from(span.style.clone())?)))
-            .collect::<Result<Vec<_>>>()?;
-        let layout_source = self.source.clone();
+            .map(|span| (span.range(), span.style()))
+            .collect::<Vec<_>>();
 
-        let key = Key::from_parts(
-            &self.source,
-            default_style.authored(),
-            validated_options.authored(),
+        let key = Key::from_validated(
+            &validated_source,
+            &default_style,
+            validated_options,
             self.system.font_generation,
         );
         if let Some(layout) = self.system.cache.get(&key) {
@@ -129,6 +127,7 @@ impl Builder<'_> {
             return Ok(layout.clone());
         }
 
+        let layout_source = validated_source.source().clone();
         let mut builder = self.system.layout_context.ranged_builder(
             &mut self.system.font_context,
             &layout_source.text,
@@ -171,16 +170,6 @@ impl Builder<'_> {
         self.system.cache.insert(key, layout.clone());
         Ok(layout)
     }
-}
-
-fn validate_source(source: &Source) -> Result<()> {
-    for span in &source.spans {
-        range::validate(source.text(), span.range)?;
-    }
-    for box_ in &source.boxes {
-        range::validate_index(source.text(), box_.index, "inline box index")?;
-    }
-    Ok(())
 }
 
 fn push_style_defaults(builder: &mut parley::RangedBuilder<'_, Brush>, style: &ValidatedStyle) {

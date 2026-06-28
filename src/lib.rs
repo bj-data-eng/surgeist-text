@@ -18,7 +18,7 @@ mod source_model;
 mod style;
 mod system;
 
-pub use cache::{Key, OptionsKey, SourceKey, Stats, StyleKey};
+pub use cache::{FontGeneration, Key, OptionsKey, SourceKey, Stats, StyleKey};
 pub use composer::{Composer, Mark, compose, source};
 pub use error::{Error, ErrorCode, Result};
 pub use geometry::{Point, Rect, Size};
@@ -32,7 +32,9 @@ pub use layout::{
 };
 pub use options::{Alignment, Indent, Options, ValidatedOptions};
 pub use range::{Range, SourcePosition, SourceRange};
-pub use source_model::{InlineBox, InlineBoxKind, Source, Span};
+pub use source_model::{
+    InlineBox, InlineBoxKind, Source, SourceIdentity, SourceRevision, Span, ValidatedSource,
+};
 pub use style::{
     Brush, Decoration, Direction, Font, LineHeight, OverflowWrap, Slant, Style, ValidatedStyle,
     Weight, WhiteSpace, Width, WordBreak, Wrap,
