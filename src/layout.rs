@@ -3,9 +3,9 @@ use std::{fmt, ops::Range as StdRange};
 use parley::PositionedLayoutItem;
 
 use super::geometry::rect_from_bounds;
-use super::system::validate_range;
 use super::{
-    Brush, Direction, Id, InlineBoxKind, Key, Point, Range, Rect, Result, Size, Source, Style,
+    Brush, Direction, Id, InlineBoxKind, Key, Point, Range, Rect, Result, Size, Source,
+    SourcePosition, SourceRange, Style,
 };
 
 /// Immutable shaped and line-broken layout.
@@ -542,29 +542,33 @@ impl Layout {
         let mut source = self.source.clone();
         match edit {
             Edit::Insert { index, text } => {
-                validate_range(&source.text, Range::new(index, index))?;
-                project_edit_ranges(&mut source, Range::new(index, index), text.len());
-                source.revision = source.revision.saturating_add(1);
-                source.text.insert_str(index, &text);
-            }
-            Edit::Replace { range, text } => {
-                validate_range(&source.text, range)?;
+                let position = SourcePosition::try_new(&source.text, index)?;
+                let range = SourceRange::from_unchecked(position, position);
                 project_edit_ranges(&mut source, range, text.len());
                 source.revision = source.revision.saturating_add(1);
-                source.text.replace_range(StdRange::from(range), &text);
+                source.text.insert_str(position.get(), &text);
+            }
+            Edit::Replace { range, text } => {
+                let range = SourceRange::try_new(&source.text, range.start, range.end)?;
+                project_edit_ranges(&mut source, range, text.len());
+                source.revision = source.revision.saturating_add(1);
+                source
+                    .text
+                    .replace_range(StdRange::from(range.range()), &text);
             }
             Edit::Delete { range } => {
-                validate_range(&source.text, range)?;
+                let range = SourceRange::try_new(&source.text, range.start, range.end)?;
                 project_edit_ranges(&mut source, range, 0);
                 source.revision = source.revision.saturating_add(1);
-                source.text.replace_range(StdRange::from(range), "");
+                source.text.replace_range(StdRange::from(range.range()), "");
             }
         }
         Ok(source)
     }
 }
 
-fn project_edit_ranges(source: &mut Source, range: Range, inserted_len: usize) {
+fn project_edit_ranges(source: &mut Source, source_range: SourceRange, inserted_len: usize) {
+    let range = source_range.range();
     let removed_len = range.len();
     for span in &mut source.spans {
         span.range = Range::new(

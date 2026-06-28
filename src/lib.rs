@@ -31,7 +31,7 @@ pub use layout::{
     SelectionGeometry, SelectionRect,
 };
 pub use options::{Alignment, Indent, Options};
-pub use range::Range;
+pub use range::{Range, SourcePosition, SourceRange};
 pub use source_model::{InlineBox, InlineBoxKind, Source, Span};
 pub use style::{
     Brush, Decoration, Direction, Font, LineHeight, OverflowWrap, Slant, Style, Weight, WhiteSpace,

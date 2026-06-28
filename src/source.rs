@@ -1,4 +1,4 @@
-use super::{Id, Range, Size, Style};
+use super::{Id, Range, Size, SourcePosition, SourceRange, Style};
 
 /// Text source plus resolved style spans and inline boxes.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -40,9 +40,9 @@ impl Source {
     }
 
     pub fn push(&mut self, text: impl AsRef<str>) -> Range {
-        let start = self.text.len();
+        let start = SourcePosition::from_unchecked(self.text.len());
         self.text.push_str(text.as_ref());
-        Range::new(start, self.text.len())
+        SourceRange::from_unchecked(start, SourcePosition::from_unchecked(self.text.len())).range()
     }
 
     pub fn span(&mut self, range: Range, style: Style) -> &mut Self {

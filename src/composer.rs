@@ -1,4 +1,7 @@
-use super::{Id, InlineBox, InlineBoxKind, Range, Result, Size, Source, Span, Style, range};
+use super::{
+    Id, InlineBox, InlineBoxKind, Range, Result, Size, Source, SourcePosition, SourceRange, Span,
+    Style,
+};
 
 pub fn source(children: impl FnOnce(&mut Composer)) -> Source {
     let mut composer = Composer::new();
@@ -72,13 +75,13 @@ impl Composer {
     }
 
     pub fn try_span(&mut self, range: Range, style: Style) -> Result<&mut Self> {
-        range::validate(self.source.text(), range)?;
-        self.source.span(range, style);
+        let range = SourceRange::try_new(self.source.text(), range.start, range.end)?;
+        self.source.span(range.range(), style);
         Ok(self)
     }
 
     pub fn try_inline_box(&mut self, box_: InlineBox) -> Result<&mut Self> {
-        range::validate_index(self.source.text(), box_.index, "inline box index")?;
+        SourcePosition::try_new(self.source.text(), box_.index)?;
         self.source.inline_box(box_);
         Ok(self)
     }

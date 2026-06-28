@@ -31,6 +31,31 @@ fn rejects_invalid_utf8_inline_box_boundary() {
 }
 
 #[test]
+fn source_position_accepts_only_utf8_boundaries() {
+    let text = "é text";
+
+    let position = SourcePosition::try_new(text, 2).expect("boundary should validate");
+    let error = SourcePosition::try_new(text, 1).expect_err("middle of scalar should fail");
+
+    assert_eq!(position.get(), 2);
+    assert_eq!(error.code, ErrorCode::InvalidRange);
+}
+
+#[test]
+fn source_range_accepts_only_ordered_utf8_boundaries() {
+    let text = "é text";
+
+    let range = SourceRange::try_new(text, 0, 2).expect("valid source range");
+    let reversed = SourceRange::try_new(text, 2, 0).expect_err("reversed range should fail");
+    let split = SourceRange::try_new(text, 0, 1).expect_err("split scalar should fail");
+
+    assert_eq!(range.start().get(), 0);
+    assert_eq!(range.end().get(), 2);
+    assert_eq!(reversed.code, ErrorCode::InvalidRange);
+    assert_eq!(split.code, ErrorCode::InvalidRange);
+}
+
+#[test]
 fn rejects_invalid_numeric_layout_options() {
     let mut system = System::default();
     let mut builder = system.builder("hello");

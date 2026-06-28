@@ -177,10 +177,6 @@ fn validate_source(source: &Source) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_range(text: &str, range: Range) -> Result<()> {
-    range::validate(text, range)
-}
-
 fn validate_options(options: &Options) -> Result<()> {
     validate_positive_f32(options.scale, "text scale")?;
     if let Some(width) = options.width {
