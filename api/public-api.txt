@@ -360,6 +360,18 @@ pub surgeist_text::SourceKey::id: core::option::Option<surgeist_text::Id>
 pub surgeist_text::SourceKey::revision: u64
 impl surgeist_text::SourceKey
 pub const fn surgeist_text::SourceKey::new(id: core::option::Option<surgeist_text::Id>, revision: u64, hash: u64) -> Self
+pub struct surgeist_text::SourcePosition(_)
+impl surgeist_text::SourcePosition
+pub const fn surgeist_text::SourcePosition::from_unchecked(index: usize) -> Self
+pub const fn surgeist_text::SourcePosition::get(self) -> usize
+pub fn surgeist_text::SourcePosition::try_new(text: &str, index: usize) -> surgeist_text::Result<Self>
+pub struct surgeist_text::SourceRange
+impl surgeist_text::SourceRange
+pub const fn surgeist_text::SourceRange::end(self) -> surgeist_text::SourcePosition
+pub const fn surgeist_text::SourceRange::from_unchecked(start: surgeist_text::SourcePosition, end: surgeist_text::SourcePosition) -> Self
+pub const fn surgeist_text::SourceRange::range(self) -> surgeist_text::Range
+pub const fn surgeist_text::SourceRange::start(self) -> surgeist_text::SourcePosition
+pub fn surgeist_text::SourceRange::try_new(text: &str, start: usize, end: usize) -> surgeist_text::Result<Self>
 pub struct surgeist_text::Span
 pub surgeist_text::Span::range: surgeist_text::Range
 pub surgeist_text::Span::style: surgeist_text::Style
