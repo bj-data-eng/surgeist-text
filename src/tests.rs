@@ -916,6 +916,47 @@ fn edits_validate_ranges() {
 }
 
 #[test]
+fn text_edit_normalizes_insert_replace_and_delete() {
+    let source = Source::identified("hello", Id::from_u64(4), 10);
+
+    let insert = TextEdit::insert(&source, 2, "y").expect("insert validates");
+    let replace = TextEdit::replace(&source, Range::new(1, 4), "ipp").expect("replace validates");
+    let delete = TextEdit::delete(&source, Range::new(1, 4)).expect("delete validates");
+
+    assert_eq!(insert.range(), Range::new(2, 2));
+    assert_eq!(insert.inserted_text(), "y");
+    assert_eq!(replace.range(), Range::new(1, 4));
+    assert_eq!(replace.inserted_text(), "ipp");
+    assert_eq!(delete.range(), Range::new(1, 4));
+    assert_eq!(delete.inserted_text(), "");
+}
+
+#[test]
+fn text_edit_application_advances_source_revision_once() {
+    let source = Source::identified("hello", Id::from_u64(4), 10);
+    let edit = TextEdit::insert(&source, 2, "y").expect("insert validates");
+
+    let edited = edit
+        .apply_to(source)
+        .expect("edit applies to original source");
+
+    assert_eq!(edited.text(), "heyllo");
+    assert_eq!(edited.revision(), 11);
+}
+
+#[test]
+fn text_edit_revalidates_target_source_before_applying() {
+    let source = Source::new("hello");
+    let edit = TextEdit::replace(&source, Range::new(1, 4), "ipp").expect("replace validates");
+
+    let error = edit
+        .apply_to(Source::new("é"))
+        .expect_err("edit range should be invalid for different source");
+
+    assert_eq!(error.code, ErrorCode::InvalidRange);
+}
+
+#[test]
 fn edits_project_ranges_and_revision() {
     let mut system = System::default();
     let mut builder = system.builder("abcdef");

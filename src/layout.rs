@@ -1,11 +1,10 @@
-use std::{fmt, ops::Range as StdRange};
+use std::fmt;
 
 use parley::PositionedLayoutItem;
 
 use super::geometry::rect_from_bounds;
 use super::{
-    Brush, Direction, Id, InlineBoxKind, Key, Point, Range, Rect, Result, Size, Source,
-    SourcePosition, SourceRange, Style,
+    Brush, Direction, Edit, Id, InlineBoxKind, Key, Point, Range, Rect, Result, Size, Source, Style,
 };
 
 /// Immutable shaped and line-broken layout.
@@ -539,85 +538,7 @@ impl Layout {
     }
 
     pub fn try_apply(&self, edit: Edit) -> Result<Source> {
-        let mut source = self.source.clone();
-        match edit {
-            Edit::Insert { index, text } => {
-                let position = SourcePosition::try_new(&source.text, index)?;
-                let range = SourceRange::from_unchecked(position, position);
-                project_edit_ranges(&mut source, range, text.len());
-                source.revision = source.revision.saturating_add(1);
-                source.text.insert_str(position.get(), &text);
-            }
-            Edit::Replace { range, text } => {
-                let range = SourceRange::try_new(&source.text, range.start, range.end)?;
-                project_edit_ranges(&mut source, range, text.len());
-                source.revision = source.revision.saturating_add(1);
-                source
-                    .text
-                    .replace_range(StdRange::from(range.range()), &text);
-            }
-            Edit::Delete { range } => {
-                let range = SourceRange::try_new(&source.text, range.start, range.end)?;
-                project_edit_ranges(&mut source, range, 0);
-                source.revision = source.revision.saturating_add(1);
-                source.text.replace_range(StdRange::from(range.range()), "");
-            }
-        }
-        Ok(source)
-    }
-}
-
-fn project_edit_ranges(source: &mut Source, source_range: SourceRange, inserted_len: usize) {
-    let range = source_range.range();
-    let removed_len = range.len();
-    for span in &mut source.spans {
-        span.range = Range::new(
-            project_edit_start(span.range.start, range, inserted_len, removed_len),
-            project_edit_end(span.range.end, range, inserted_len, removed_len),
-        );
-    }
-    for box_ in &mut source.boxes {
-        box_.index = project_edit_anchor(box_.index, range, inserted_len, removed_len);
-    }
-}
-
-fn project_edit_start(
-    index: usize,
-    range: Range,
-    inserted_len: usize,
-    removed_len: usize,
-) -> usize {
-    if index <= range.start {
-        index
-    } else if index < range.end {
-        range.start
-    } else {
-        index + inserted_len - removed_len
-    }
-}
-
-fn project_edit_end(index: usize, range: Range, inserted_len: usize, removed_len: usize) -> usize {
-    if index < range.start {
-        index
-    } else if index <= range.end {
-        range.start + inserted_len
-    } else {
-        index + inserted_len - removed_len
-    }
-}
-
-fn project_edit_anchor(
-    index: usize,
-    range: Range,
-    inserted_len: usize,
-    removed_len: usize,
-) -> usize {
-    if index <= range.start {
-        index
-    } else if index <= range.end {
-        range.start + inserted_len
-    } else {
-        index + inserted_len - removed_len
+        edit.normalize(&self.source)?.apply_to(self.source.clone())
     }
 }
 
@@ -922,11 +843,4 @@ enum LineBoundary {
 enum VerticalMovement {
     Previous,
     Next,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Edit {
-    Insert { index: usize, text: String },
-    Replace { range: Range, text: String },
-    Delete { range: Range },
 }
