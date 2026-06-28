@@ -34,6 +34,8 @@ pub surgeist_text::Edit::Insert::text: alloc::string::String
 pub surgeist_text::Edit::Replace
 pub surgeist_text::Edit::Replace::range: surgeist_text::Range
 pub surgeist_text::Edit::Replace::text: alloc::string::String
+impl surgeist_text::Edit
+pub fn surgeist_text::Edit::normalize(self, source: &surgeist_text::Source) -> surgeist_text::Result<surgeist_text::TextEdit>
 pub enum surgeist_text::ErrorCode
 pub surgeist_text::ErrorCode::FontLoadFailed
 pub surgeist_text::ErrorCode::FontSystemUnavailable
@@ -42,6 +44,22 @@ pub surgeist_text::ErrorCode::InvalidRange
 pub surgeist_text::ErrorCode::InvalidStyle
 pub surgeist_text::ErrorCode::LayoutFailed
 pub surgeist_text::ErrorCode::UnsupportedFeature
+pub enum surgeist_text::ErrorDetail
+pub surgeist_text::ErrorDetail::InvalidNumericField
+pub surgeist_text::ErrorDetail::InvalidNumericField::field: &'static str
+pub surgeist_text::ErrorDetail::InvalidNumericField::requirement: surgeist_text::NumericRequirement
+pub surgeist_text::ErrorDetail::InvalidNumericField::value: f32
+pub surgeist_text::ErrorDetail::InvalidSourceIndex
+pub surgeist_text::ErrorDetail::InvalidSourceIndex::index: usize
+pub surgeist_text::ErrorDetail::InvalidSourceIndex::name: &'static str
+pub surgeist_text::ErrorDetail::InvalidSourceIndex::text_len: usize
+pub surgeist_text::ErrorDetail::InvalidSourceRange
+pub surgeist_text::ErrorDetail::InvalidSourceRange::end: usize
+pub surgeist_text::ErrorDetail::InvalidSourceRange::start: usize
+pub surgeist_text::ErrorDetail::InvalidSourceRange::text_len: usize
+pub surgeist_text::ErrorDetail::UnsupportedCombination
+pub surgeist_text::ErrorDetail::UnsupportedCombination::feature: &'static str
+pub surgeist_text::ErrorDetail::UnsupportedCombination::reason: &'static str
 pub enum surgeist_text::Hit
 pub surgeist_text::Hit::InlineBox(surgeist_text::Id)
 pub surgeist_text::Hit::None
@@ -68,6 +86,11 @@ pub surgeist_text::Movement::NextWord
 pub surgeist_text::Movement::PreviousCluster
 pub surgeist_text::Movement::PreviousLine
 pub surgeist_text::Movement::PreviousWord
+pub enum surgeist_text::NumericRequirement
+pub surgeist_text::NumericRequirement::Finite
+pub surgeist_text::NumericRequirement::FiniteGreaterThanZero
+pub surgeist_text::NumericRequirement::FiniteNonNegative
+pub surgeist_text::NumericRequirement::UnitInterval
 pub enum surgeist_text::OverflowWrap
 pub surgeist_text::OverflowWrap::Anywhere
 pub surgeist_text::OverflowWrap::BreakWord
@@ -130,8 +153,10 @@ pub fn surgeist_text::Builder<'_>::inline_box(&mut self, box_: surgeist_text::In
 pub fn surgeist_text::Builder<'_>::options(&mut self, options: surgeist_text::Options) -> &mut Self
 pub fn surgeist_text::Builder<'_>::span(&mut self, range: surgeist_text::Range, style: surgeist_text::Style) -> &mut Self
 pub struct surgeist_text::Cluster
-pub surgeist_text::Cluster::bounds: surgeist_text::Rect
-pub surgeist_text::Cluster::range: surgeist_text::Range
+impl surgeist_text::Cluster
+pub const fn surgeist_text::Cluster::bounds(self) -> surgeist_text::Rect
+pub const fn surgeist_text::Cluster::new(range: surgeist_text::Range, bounds: surgeist_text::Rect) -> Self
+pub const fn surgeist_text::Cluster::range(self) -> surgeist_text::Range
 pub struct surgeist_text::Composer
 impl surgeist_text::Composer
 pub fn surgeist_text::Composer::box_(&mut self, id: surgeist_text::Id, kind: surgeist_text::InlineBoxKind, size: surgeist_text::Size) -> &mut Self
@@ -147,12 +172,14 @@ pub fn surgeist_text::Composer::try_inline_box(&mut self, box_: surgeist_text::I
 pub fn surgeist_text::Composer::try_span(&mut self, range: surgeist_text::Range, style: surgeist_text::Style) -> surgeist_text::Result<&mut Self>
 pub fn surgeist_text::Composer::with(&mut self, style: surgeist_text::Style, children: impl core::ops::function::FnOnce(&mut surgeist_text::Composer)) -> surgeist_text::Mark
 pub struct surgeist_text::Cursor
-pub surgeist_text::Cursor::affinity: surgeist_text::Affinity
-pub surgeist_text::Cursor::index: usize
 impl surgeist_text::Cursor
+pub const fn surgeist_text::Cursor::affinity(self) -> surgeist_text::Affinity
+pub const fn surgeist_text::Cursor::index(self) -> usize
 pub const fn surgeist_text::Cursor::new(index: usize, affinity: surgeist_text::Affinity) -> Self
 pub struct surgeist_text::CursorGeometry
-pub surgeist_text::CursorGeometry::rect: surgeist_text::Rect
+impl surgeist_text::CursorGeometry
+pub const fn surgeist_text::CursorGeometry::new(rect: surgeist_text::Rect) -> Self
+pub const fn surgeist_text::CursorGeometry::rect(self) -> surgeist_text::Rect
 pub struct surgeist_text::Decoration
 pub surgeist_text::Decoration::brush: core::option::Option<surgeist_text::Brush>
 pub surgeist_text::Decoration::enabled: bool
@@ -164,15 +191,19 @@ pub const fn surgeist_text::Decoration::solid(brush: core::option::Option<surgei
 impl core::default::Default for surgeist_text::Decoration
 pub fn surgeist_text::Decoration::default() -> Self
 pub struct surgeist_text::DecorationRun
-pub surgeist_text::DecorationRun::brush: surgeist_text::Brush
-pub surgeist_text::DecorationRun::kind: surgeist_text::DecorationKind
-pub surgeist_text::DecorationRun::rect: surgeist_text::Rect
+impl surgeist_text::DecorationRun
+pub const fn surgeist_text::DecorationRun::brush(self) -> surgeist_text::Brush
+pub const fn surgeist_text::DecorationRun::kind(self) -> surgeist_text::DecorationKind
+pub const fn surgeist_text::DecorationRun::new(rect: surgeist_text::Rect, brush: surgeist_text::Brush, kind: surgeist_text::DecorationKind) -> Self
+pub const fn surgeist_text::DecorationRun::rect(self) -> surgeist_text::Rect
 pub struct surgeist_text::Error
 pub surgeist_text::Error::code: surgeist_text::ErrorCode
 pub surgeist_text::Error::message: alloc::string::String
 pub surgeist_text::Error::source: core::option::Option<alloc::boxed::Box<(dyn core::error::Error + core::marker::Send + core::marker::Sync)>>
 impl surgeist_text::Error
+pub const fn surgeist_text::Error::detail(&self) -> core::option::Option<&surgeist_text::ErrorDetail>
 pub fn surgeist_text::Error::new(code: surgeist_text::ErrorCode, message: impl core::convert::Into<alloc::string::String>) -> Self
+pub fn surgeist_text::Error::with_detail(self, detail: surgeist_text::ErrorDetail) -> Self
 impl core::error::Error for surgeist_text::Error
 pub fn surgeist_text::Error::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Display for surgeist_text::Error
@@ -198,18 +229,25 @@ pub struct surgeist_text::FontData
 impl surgeist_text::FontData
 pub fn surgeist_text::FontData::bytes(&self) -> &[u8]
 pub const fn surgeist_text::FontData::index(&self) -> u32
+pub struct surgeist_text::FontGeneration(_)
+impl surgeist_text::FontGeneration
+pub const fn surgeist_text::FontGeneration::get(self) -> u64
+pub const fn surgeist_text::FontGeneration::initial() -> Self
+pub const fn surgeist_text::FontGeneration::next(self) -> Self
 pub struct surgeist_text::FontRef
-pub surgeist_text::FontRef::id: u64
 impl surgeist_text::FontRef
 pub fn surgeist_text::FontRef::data(&self) -> core::option::Option<&surgeist_text::FontData>
+pub const fn surgeist_text::FontRef::id(&self) -> u64
 pub const fn surgeist_text::FontRef::new(id: u64) -> Self
 pub fn surgeist_text::FontRef::with_data(self, data: surgeist_text::FontData) -> Self
 pub struct surgeist_text::Glyph
-pub surgeist_text::Glyph::advance: f32
-pub surgeist_text::Glyph::id: u32
-pub surgeist_text::Glyph::range: surgeist_text::Range
-pub surgeist_text::Glyph::x: f32
-pub surgeist_text::Glyph::y: f32
+impl surgeist_text::Glyph
+pub const fn surgeist_text::Glyph::advance(self) -> f32
+pub const fn surgeist_text::Glyph::id(self) -> u32
+pub const fn surgeist_text::Glyph::new(id: u32, x: f32, y: f32, advance: f32, range: surgeist_text::Range) -> Self
+pub const fn surgeist_text::Glyph::range(self) -> surgeist_text::Range
+pub const fn surgeist_text::Glyph::x(self) -> f32
+pub const fn surgeist_text::Glyph::y(self) -> f32
 pub struct surgeist_text::Id(_)
 impl surgeist_text::Id
 pub const fn surgeist_text::Id::as_u64(self) -> u64
@@ -222,19 +260,19 @@ pub surgeist_text::Indent::hanging: bool
 impl core::default::Default for surgeist_text::Indent
 pub fn surgeist_text::Indent::default() -> Self
 pub struct surgeist_text::InlineBox
-pub surgeist_text::InlineBox::id: surgeist_text::Id
-pub surgeist_text::InlineBox::index: usize
-pub surgeist_text::InlineBox::kind: surgeist_text::InlineBoxKind
-pub surgeist_text::InlineBox::size: surgeist_text::Size
 impl surgeist_text::InlineBox
+pub const fn surgeist_text::InlineBox::id(self) -> surgeist_text::Id
+pub const fn surgeist_text::InlineBox::index(self) -> usize
+pub const fn surgeist_text::InlineBox::kind(self) -> surgeist_text::InlineBoxKind
 pub const fn surgeist_text::InlineBox::new(id: surgeist_text::Id, kind: surgeist_text::InlineBoxKind, index: usize, size: surgeist_text::Size) -> Self
+pub const fn surgeist_text::InlineBox::size(self) -> surgeist_text::Size
 pub struct surgeist_text::Key
-pub surgeist_text::Key::font_generation: u64
-pub surgeist_text::Key::options: surgeist_text::OptionsKey
-pub surgeist_text::Key::source: surgeist_text::SourceKey
-pub surgeist_text::Key::styles: surgeist_text::StyleKey
 impl surgeist_text::Key
-pub fn surgeist_text::Key::new(source: surgeist_text::SourceKey, styles: surgeist_text::StyleKey, options: surgeist_text::OptionsKey, font_generation: u64) -> Self
+pub const fn surgeist_text::Key::font_generation(self) -> surgeist_text::FontGeneration
+pub fn surgeist_text::Key::from_validated(source: &surgeist_text::ValidatedSource, style: &surgeist_text::ValidatedStyle, options: surgeist_text::ValidatedOptions, font_generation: surgeist_text::FontGeneration) -> Self
+pub const fn surgeist_text::Key::options(self) -> surgeist_text::OptionsKey
+pub const fn surgeist_text::Key::source(self) -> surgeist_text::SourceKey
+pub const fn surgeist_text::Key::styles(self) -> surgeist_text::StyleKey
 pub struct surgeist_text::Layout
 impl surgeist_text::Layout
 pub fn surgeist_text::Layout::apply(&self, edit: surgeist_text::Edit) -> surgeist_text::Source
@@ -256,43 +294,53 @@ pub fn surgeist_text::Layout::try_apply(&self, edit: surgeist_text::Edit) -> sur
 impl core::fmt::Debug for surgeist_text::Layout
 pub fn surgeist_text::Layout::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct surgeist_text::Line
-pub surgeist_text::Line::baseline: f32
-pub surgeist_text::Line::bounds: surgeist_text::Rect
-pub surgeist_text::Line::index: usize
-pub surgeist_text::Line::range: surgeist_text::Range
+impl surgeist_text::Line
+pub const fn surgeist_text::Line::baseline(self) -> f32
+pub const fn surgeist_text::Line::bounds(self) -> surgeist_text::Rect
+pub const fn surgeist_text::Line::index(self) -> usize
+pub const fn surgeist_text::Line::new(index: usize, range: surgeist_text::Range, baseline: f32, bounds: surgeist_text::Rect) -> Self
+pub const fn surgeist_text::Line::range(self) -> surgeist_text::Range
 pub struct surgeist_text::Mark
 impl surgeist_text::Mark
 pub const fn surgeist_text::Mark::is_empty(self) -> bool
 pub const fn surgeist_text::Mark::range(self) -> surgeist_text::Range
 pub struct surgeist_text::Metrics
-pub surgeist_text::Metrics::first_baseline: core::option::Option<f32>
-pub surgeist_text::Metrics::full_width: f32
-pub surgeist_text::Metrics::last_baseline: core::option::Option<f32>
-pub surgeist_text::Metrics::line_count: usize
-pub surgeist_text::Metrics::overflow: bool
-pub surgeist_text::Metrics::size: surgeist_text::Size
+impl surgeist_text::Metrics
+pub const fn surgeist_text::Metrics::first_baseline(self) -> core::option::Option<f32>
+pub const fn surgeist_text::Metrics::full_width(self) -> f32
+pub const fn surgeist_text::Metrics::last_baseline(self) -> core::option::Option<f32>
+pub const fn surgeist_text::Metrics::line_count(self) -> usize
+pub const fn surgeist_text::Metrics::new(size: surgeist_text::Size, full_width: f32, line_count: usize, first_baseline: core::option::Option<f32>, last_baseline: core::option::Option<f32>, overflow: bool) -> Self
+pub const fn surgeist_text::Metrics::overflow(self) -> bool
+pub const fn surgeist_text::Metrics::size(self) -> surgeist_text::Size
 pub struct surgeist_text::Options
 pub surgeist_text::Options::alignment: surgeist_text::Alignment
 pub surgeist_text::Options::indent: surgeist_text::Indent
 pub surgeist_text::Options::quantize: bool
 pub surgeist_text::Options::scale: f32
 pub surgeist_text::Options::width: core::option::Option<f32>
+impl core::convert::TryFrom<surgeist_text::Options> for surgeist_text::ValidatedOptions
+pub type surgeist_text::ValidatedOptions::Error = surgeist_text::Error
+pub fn surgeist_text::ValidatedOptions::try_from(options: surgeist_text::Options) -> surgeist_text::Result<Self>
 impl core::default::Default for surgeist_text::Options
 pub fn surgeist_text::Options::default() -> Self
 pub struct surgeist_text::OptionsKey
-pub surgeist_text::OptionsKey::hash: u64
 impl surgeist_text::OptionsKey
-pub const fn surgeist_text::OptionsKey::new(hash: u64) -> Self
+pub const fn surgeist_text::OptionsKey::hash(self) -> u64
 pub struct surgeist_text::Point
 pub surgeist_text::Point::x: f32
 pub surgeist_text::Point::y: f32
 impl surgeist_text::Point
 pub const fn surgeist_text::Point::new(x: f32, y: f32) -> Self
+pub const fn surgeist_text::Point::x(self) -> f32
+pub const fn surgeist_text::Point::y(self) -> f32
 pub struct surgeist_text::PositionedInlineBox
-pub surgeist_text::PositionedInlineBox::id: surgeist_text::Id
-pub surgeist_text::PositionedInlineBox::index: usize
-pub surgeist_text::PositionedInlineBox::kind: surgeist_text::InlineBoxKind
-pub surgeist_text::PositionedInlineBox::rect: surgeist_text::Rect
+impl surgeist_text::PositionedInlineBox
+pub const fn surgeist_text::PositionedInlineBox::id(self) -> surgeist_text::Id
+pub const fn surgeist_text::PositionedInlineBox::index(self) -> usize
+pub const fn surgeist_text::PositionedInlineBox::kind(self) -> surgeist_text::InlineBoxKind
+pub const fn surgeist_text::PositionedInlineBox::new(id: surgeist_text::Id, kind: surgeist_text::InlineBoxKind, rect: surgeist_text::Rect, index: usize) -> Self
+pub const fn surgeist_text::PositionedInlineBox::rect(self) -> surgeist_text::Rect
 pub struct surgeist_text::Range
 pub surgeist_text::Range::end: usize
 pub surgeist_text::Range::start: usize
@@ -309,39 +357,51 @@ pub surgeist_text::Rect::size: surgeist_text::Size
 impl surgeist_text::Rect
 pub fn surgeist_text::Rect::contains(self, point: surgeist_text::Point) -> bool
 pub const fn surgeist_text::Rect::new(x: f32, y: f32, width: f32, height: f32) -> Self
+pub const fn surgeist_text::Rect::origin(self) -> surgeist_text::Point
+pub const fn surgeist_text::Rect::size(self) -> surgeist_text::Size
 pub struct surgeist_text::Run
-pub surgeist_text::Run::advance: f32
-pub surgeist_text::Run::baseline: f32
-pub surgeist_text::Run::brush: surgeist_text::Brush
-pub surgeist_text::Run::font: surgeist_text::FontRef
-pub surgeist_text::Run::font_size: f32
-pub surgeist_text::Run::glyphs: alloc::vec::Vec<surgeist_text::Glyph>
-pub surgeist_text::Run::offset: f32
-pub surgeist_text::Run::style: surgeist_text::Style
+impl surgeist_text::Run
+pub const fn surgeist_text::Run::advance(&self) -> f32
+pub const fn surgeist_text::Run::baseline(&self) -> f32
+pub const fn surgeist_text::Run::brush(&self) -> surgeist_text::Brush
+pub fn surgeist_text::Run::font(&self) -> &surgeist_text::FontRef
+pub const fn surgeist_text::Run::font_size(&self) -> f32
+pub fn surgeist_text::Run::glyphs(&self) -> &[surgeist_text::Glyph]
+pub fn surgeist_text::Run::new(font: surgeist_text::FontRef, style: surgeist_text::Style, brush: surgeist_text::Brush, metrics: surgeist_text::RunMetrics, glyphs: alloc::vec::Vec<surgeist_text::Glyph>) -> Self
+pub const fn surgeist_text::Run::offset(&self) -> f32
+pub const fn surgeist_text::Run::style(&self) -> &surgeist_text::Style
+pub struct surgeist_text::RunMetrics
+impl surgeist_text::RunMetrics
+pub const fn surgeist_text::RunMetrics::advance(self) -> f32
+pub const fn surgeist_text::RunMetrics::baseline(self) -> f32
+pub const fn surgeist_text::RunMetrics::font_size(self) -> f32
+pub const fn surgeist_text::RunMetrics::new(font_size: f32, baseline: f32, offset: f32, advance: f32) -> Self
+pub const fn surgeist_text::RunMetrics::offset(self) -> f32
 pub struct surgeist_text::Selection
-pub surgeist_text::Selection::anchor: surgeist_text::Cursor
-pub surgeist_text::Selection::focus: surgeist_text::Cursor
 impl surgeist_text::Selection
+pub const fn surgeist_text::Selection::anchor(self) -> surgeist_text::Cursor
 pub const fn surgeist_text::Selection::collapsed(cursor: surgeist_text::Cursor) -> Self
+pub const fn surgeist_text::Selection::focus(self) -> surgeist_text::Cursor
 pub const fn surgeist_text::Selection::is_collapsed(self) -> bool
 pub const fn surgeist_text::Selection::new(anchor: surgeist_text::Cursor, focus: surgeist_text::Cursor) -> Self
 pub fn surgeist_text::Selection::range(self) -> surgeist_text::Range
 pub struct surgeist_text::SelectionGeometry
-pub surgeist_text::SelectionGeometry::rects: alloc::vec::Vec<surgeist_text::SelectionRect>
+impl surgeist_text::SelectionGeometry
+pub fn surgeist_text::SelectionGeometry::new(rects: alloc::vec::Vec<surgeist_text::SelectionRect>) -> Self
+pub fn surgeist_text::SelectionGeometry::rects(&self) -> &[surgeist_text::SelectionRect]
 pub struct surgeist_text::SelectionRect
-pub surgeist_text::SelectionRect::line: usize
-pub surgeist_text::SelectionRect::rect: surgeist_text::Rect
+impl surgeist_text::SelectionRect
+pub const fn surgeist_text::SelectionRect::line(self) -> usize
+pub const fn surgeist_text::SelectionRect::new(rect: surgeist_text::Rect, line: usize) -> Self
+pub const fn surgeist_text::SelectionRect::rect(self) -> surgeist_text::Rect
 pub struct surgeist_text::Size
 pub surgeist_text::Size::height: f32
 pub surgeist_text::Size::width: f32
 impl surgeist_text::Size
+pub const fn surgeist_text::Size::height(self) -> f32
 pub const fn surgeist_text::Size::new(width: f32, height: f32) -> Self
+pub const fn surgeist_text::Size::width(self) -> f32
 pub struct surgeist_text::Source
-pub surgeist_text::Source::boxes: alloc::vec::Vec<surgeist_text::InlineBox>
-pub surgeist_text::Source::id: core::option::Option<surgeist_text::Id>
-pub surgeist_text::Source::revision: u64
-pub surgeist_text::Source::spans: alloc::vec::Vec<surgeist_text::Span>
-pub surgeist_text::Source::text: alloc::string::String
 impl surgeist_text::Source
 pub fn surgeist_text::Source::boxes(&self) -> &[surgeist_text::InlineBox]
 pub const fn surgeist_text::Source::id(&self) -> core::option::Option<surgeist_text::Id>
@@ -354,12 +414,19 @@ pub fn surgeist_text::Source::set_identity(&mut self, id: core::option::Option<s
 pub fn surgeist_text::Source::span(&mut self, range: surgeist_text::Range, style: surgeist_text::Style) -> &mut Self
 pub fn surgeist_text::Source::spans(&self) -> &[surgeist_text::Span]
 pub fn surgeist_text::Source::text(&self) -> &str
+impl core::convert::TryFrom<surgeist_text::Source> for surgeist_text::ValidatedSource
+pub type surgeist_text::ValidatedSource::Error = surgeist_text::Error
+pub fn surgeist_text::ValidatedSource::try_from(source: surgeist_text::Source) -> surgeist_text::Result<Self>
+pub struct surgeist_text::SourceIdentity
+impl surgeist_text::SourceIdentity
+pub const fn surgeist_text::SourceIdentity::id(self) -> core::option::Option<surgeist_text::Id>
+pub const fn surgeist_text::SourceIdentity::new(id: core::option::Option<surgeist_text::Id>, revision: surgeist_text::SourceRevision) -> Self
+pub const fn surgeist_text::SourceIdentity::revision(self) -> surgeist_text::SourceRevision
 pub struct surgeist_text::SourceKey
-pub surgeist_text::SourceKey::hash: u64
-pub surgeist_text::SourceKey::id: core::option::Option<surgeist_text::Id>
-pub surgeist_text::SourceKey::revision: u64
 impl surgeist_text::SourceKey
-pub const fn surgeist_text::SourceKey::new(id: core::option::Option<surgeist_text::Id>, revision: u64, hash: u64) -> Self
+pub const fn surgeist_text::SourceKey::hash(self) -> u64
+pub const fn surgeist_text::SourceKey::id(self) -> core::option::Option<surgeist_text::Id>
+pub const fn surgeist_text::SourceKey::revision(self) -> surgeist_text::SourceRevision
 pub struct surgeist_text::SourcePosition(_)
 impl surgeist_text::SourcePosition
 pub const fn surgeist_text::SourcePosition::from_unchecked(index: usize) -> Self
@@ -372,16 +439,22 @@ pub const fn surgeist_text::SourceRange::from_unchecked(start: surgeist_text::So
 pub const fn surgeist_text::SourceRange::range(self) -> surgeist_text::Range
 pub const fn surgeist_text::SourceRange::start(self) -> surgeist_text::SourcePosition
 pub fn surgeist_text::SourceRange::try_new(text: &str, start: usize, end: usize) -> surgeist_text::Result<Self>
+pub struct surgeist_text::SourceRevision(_)
+impl surgeist_text::SourceRevision
+pub const fn surgeist_text::SourceRevision::get(self) -> u64
+pub const fn surgeist_text::SourceRevision::new(value: u64) -> Self
+pub const fn surgeist_text::SourceRevision::next(self) -> Self
 pub struct surgeist_text::Span
-pub surgeist_text::Span::range: surgeist_text::Range
-pub surgeist_text::Span::style: surgeist_text::Style
 impl surgeist_text::Span
 pub const fn surgeist_text::Span::new(range: surgeist_text::Range, style: surgeist_text::Style) -> Self
+pub const fn surgeist_text::Span::range(&self) -> surgeist_text::Range
+pub const fn surgeist_text::Span::style(&self) -> &surgeist_text::Style
 pub struct surgeist_text::Stats
-pub surgeist_text::Stats::font_refreshes: usize
-pub surgeist_text::Stats::invalidations: usize
-pub surgeist_text::Stats::layout_hits: usize
-pub surgeist_text::Stats::layout_misses: usize
+impl surgeist_text::Stats
+pub const fn surgeist_text::Stats::font_refreshes(self) -> usize
+pub const fn surgeist_text::Stats::invalidations(self) -> usize
+pub const fn surgeist_text::Stats::layout_hits(self) -> usize
+pub const fn surgeist_text::Stats::layout_misses(self) -> usize
 pub struct surgeist_text::Style
 pub surgeist_text::Style::brush: surgeist_text::Brush
 pub surgeist_text::Style::direction: surgeist_text::Direction
@@ -399,13 +472,15 @@ pub surgeist_text::Style::word_spacing: f32
 pub surgeist_text::Style::wrap: surgeist_text::Wrap
 impl surgeist_text::Style
 pub fn surgeist_text::Style::new() -> Self
+impl core::convert::TryFrom<surgeist_text::Style> for surgeist_text::ValidatedStyle
+pub type surgeist_text::ValidatedStyle::Error = surgeist_text::Error
+pub fn surgeist_text::ValidatedStyle::try_from(style: surgeist_text::Style) -> surgeist_text::Result<Self>
 impl core::default::Default for surgeist_text::Style
 pub fn surgeist_text::Style::default() -> Self
 pub struct surgeist_text::StyleKey
-pub surgeist_text::StyleKey::hash: u64
-pub surgeist_text::StyleKey::revision: u64
 impl surgeist_text::StyleKey
-pub const fn surgeist_text::StyleKey::new(revision: u64, hash: u64) -> Self
+pub const fn surgeist_text::StyleKey::hash(self) -> u64
+pub const fn surgeist_text::StyleKey::revision(self) -> u64
 pub struct surgeist_text::System
 impl surgeist_text::System
 pub fn surgeist_text::System::builder(&mut self, text: impl core::convert::Into<alloc::string::String>) -> surgeist_text::Builder<'_>
@@ -416,6 +491,38 @@ pub const fn surgeist_text::System::stats(&self) -> surgeist_text::Stats
 impl core::default::Default for surgeist_text::System
 pub fn surgeist_text::System::default() -> Self
 pub struct surgeist_text::SystemOptions
+pub struct surgeist_text::TextEdit
+impl surgeist_text::TextEdit
+pub fn surgeist_text::TextEdit::apply_to(&self, source: surgeist_text::Source) -> surgeist_text::Result<surgeist_text::Source>
+pub fn surgeist_text::TextEdit::delete(source: &surgeist_text::Source, range: surgeist_text::Range) -> surgeist_text::Result<Self>
+pub fn surgeist_text::TextEdit::insert(source: &surgeist_text::Source, index: usize, text: impl core::convert::Into<alloc::string::String>) -> surgeist_text::Result<Self>
+pub fn surgeist_text::TextEdit::inserted_text(&self) -> &str
+pub const fn surgeist_text::TextEdit::range(&self) -> surgeist_text::Range
+pub fn surgeist_text::TextEdit::replace(source: &surgeist_text::Source, range: surgeist_text::Range, text: impl core::convert::Into<alloc::string::String>) -> surgeist_text::Result<Self>
+pub struct surgeist_text::ValidatedOptions
+impl surgeist_text::ValidatedOptions
+pub const fn surgeist_text::ValidatedOptions::authored(self) -> surgeist_text::Options
+pub const fn surgeist_text::ValidatedOptions::indent(self) -> surgeist_text::Indent
+impl core::convert::TryFrom<surgeist_text::Options> for surgeist_text::ValidatedOptions
+pub type surgeist_text::ValidatedOptions::Error = surgeist_text::Error
+pub fn surgeist_text::ValidatedOptions::try_from(options: surgeist_text::Options) -> surgeist_text::Result<Self>
+pub struct surgeist_text::ValidatedSource
+impl surgeist_text::ValidatedSource
+pub const fn surgeist_text::ValidatedSource::identity(&self) -> surgeist_text::SourceIdentity
+pub const fn surgeist_text::ValidatedSource::source(&self) -> &surgeist_text::Source
+impl core::convert::TryFrom<surgeist_text::Source> for surgeist_text::ValidatedSource
+pub type surgeist_text::ValidatedSource::Error = surgeist_text::Error
+pub fn surgeist_text::ValidatedSource::try_from(source: surgeist_text::Source) -> surgeist_text::Result<Self>
+pub struct surgeist_text::ValidatedStyle
+impl surgeist_text::ValidatedStyle
+pub const fn surgeist_text::ValidatedStyle::authored(&self) -> &surgeist_text::Style
+pub fn surgeist_text::ValidatedStyle::font_families(&self) -> &[alloc::string::String]
+pub fn surgeist_text::ValidatedStyle::font_features(&self) -> &[alloc::string::String]
+pub fn surgeist_text::ValidatedStyle::font_variations(&self) -> &[alloc::string::String]
+pub fn surgeist_text::ValidatedStyle::locale_tag(&self) -> core::option::Option<&str>
+impl core::convert::TryFrom<surgeist_text::Style> for surgeist_text::ValidatedStyle
+pub type surgeist_text::ValidatedStyle::Error = surgeist_text::Error
+pub fn surgeist_text::ValidatedStyle::try_from(style: surgeist_text::Style) -> surgeist_text::Result<Self>
 pub fn surgeist_text::compose() -> surgeist_text::Composer
 pub fn surgeist_text::source(children: impl core::ops::function::FnOnce(&mut surgeist_text::Composer)) -> surgeist_text::Source
 pub type surgeist_text::Result<T> = core::result::Result<T, surgeist_text::Error>
