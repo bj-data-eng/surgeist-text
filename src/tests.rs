@@ -56,6 +56,21 @@ fn source_range_accepts_only_ordered_utf8_boundaries() {
 }
 
 #[test]
+fn invalid_range_error_names_rejected_boundary() {
+    let error = SourceRange::try_new("é", 0, 1).expect_err("split scalar should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidRange);
+    assert_eq!(
+        error.detail(),
+        Some(&ErrorDetail::InvalidSourceRange {
+            start: 0,
+            end: 1,
+            text_len: 2,
+        })
+    );
+}
+
+#[test]
 fn rejects_invalid_numeric_layout_options() {
     let mut system = System::default();
     let mut builder = system.builder("hello");
@@ -279,6 +294,26 @@ fn validated_style_rejects_invalid_oblique_angle() {
     let error = ValidatedStyle::try_from(style).expect_err("invalid oblique angle should fail");
 
     assert_eq!(error.code, ErrorCode::InvalidStyle);
+}
+
+#[test]
+fn invalid_style_error_names_rejected_field() {
+    let style = Style {
+        size: 0.0,
+        ..Style::default()
+    };
+
+    let error = ValidatedStyle::try_from(style).expect_err("zero size should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+    assert_eq!(
+        error.detail(),
+        Some(&ErrorDetail::InvalidNumericField {
+            field: "font size",
+            value: 0.0,
+            requirement: NumericRequirement::FiniteGreaterThanZero,
+        })
+    );
 }
 
 #[test]

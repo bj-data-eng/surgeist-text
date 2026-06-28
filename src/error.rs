@@ -8,6 +8,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Error {
     pub code: ErrorCode,
     pub message: String,
+    detail: Option<ErrorDetail>,
     pub source: Option<Box<dyn error::Error + Send + Sync>>,
 }
 
@@ -17,8 +18,20 @@ impl Error {
         Self {
             code,
             message: message.into(),
+            detail: None,
             source: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_detail(mut self, detail: ErrorDetail) -> Self {
+        self.detail = Some(detail);
+        self
+    }
+
+    #[must_use]
+    pub const fn detail(&self) -> Option<&ErrorDetail> {
+        self.detail.as_ref()
     }
 }
 
@@ -43,4 +56,35 @@ pub enum ErrorCode {
     LayoutFailed,
     HitTestFailed,
     UnsupportedFeature,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ErrorDetail {
+    InvalidSourceRange {
+        start: usize,
+        end: usize,
+        text_len: usize,
+    },
+    InvalidSourceIndex {
+        name: &'static str,
+        index: usize,
+        text_len: usize,
+    },
+    InvalidNumericField {
+        field: &'static str,
+        value: f32,
+        requirement: NumericRequirement,
+    },
+    UnsupportedCombination {
+        feature: &'static str,
+        reason: &'static str,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NumericRequirement {
+    Finite,
+    FiniteNonNegative,
+    FiniteGreaterThanZero,
+    UnitInterval,
 }

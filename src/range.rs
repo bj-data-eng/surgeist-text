@@ -1,6 +1,6 @@
 use std::ops::Range as StdRange;
 
-use super::{Error, ErrorCode, Result};
+use super::{Error, ErrorCode, ErrorDetail, Result};
 
 /// Byte range in source text.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -99,13 +99,13 @@ pub(crate) fn validate(text: &str, range: Range) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_index(text: &str, index: usize, name: &str) -> Result<()> {
+pub(crate) fn validate_index(text: &str, index: usize, name: &'static str) -> Result<()> {
     SourcePosition::try_new_with_name(text, index, name)?;
     Ok(())
 }
 
 impl SourcePosition {
-    fn try_new_with_name(text: &str, index: usize, name: &str) -> Result<Self> {
+    fn try_new_with_name(text: &str, index: usize, name: &'static str) -> Result<Self> {
         validate_index_raw(text, index, name)?;
         Ok(Self(index))
     }
@@ -121,7 +121,12 @@ fn validate_raw(text: &str, range: Range) -> Result<()> {
                 range.end,
                 text.len()
             ),
-        ));
+        )
+        .with_detail(ErrorDetail::InvalidSourceRange {
+            start: range.start,
+            end: range.end,
+            text_len: text.len(),
+        }));
     }
     if !text.is_char_boundary(range.start) || !text.is_char_boundary(range.end) {
         return Err(Error::new(
@@ -130,17 +135,27 @@ fn validate_raw(text: &str, range: Range) -> Result<()> {
                 "range {}..{} does not align to UTF-8 boundaries",
                 range.start, range.end
             ),
-        ));
+        )
+        .with_detail(ErrorDetail::InvalidSourceRange {
+            start: range.start,
+            end: range.end,
+            text_len: text.len(),
+        }));
     }
     Ok(())
 }
 
-fn validate_index_raw(text: &str, index: usize, name: &str) -> Result<()> {
+fn validate_index_raw(text: &str, index: usize, name: &'static str) -> Result<()> {
     if index > text.len() || !text.is_char_boundary(index) {
         return Err(Error::new(
             ErrorCode::InvalidRange,
             format!("{name} {index} is not a valid UTF-8 boundary"),
-        ));
+        )
+        .with_detail(ErrorDetail::InvalidSourceIndex {
+            name,
+            index,
+            text_len: text.len(),
+        }));
     }
     Ok(())
 }

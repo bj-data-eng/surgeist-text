@@ -22,7 +22,7 @@ mod system;
 pub use cache::{FontGeneration, Key, OptionsKey, SourceKey, Stats, StyleKey};
 pub use composer::{Composer, Mark, compose, source};
 pub use edit::{Edit, TextEdit};
-pub use error::{Error, ErrorCode, Result};
+pub use error::{Error, ErrorCode, ErrorDetail, NumericRequirement, Result};
 pub use geometry::{Point, Rect, Size};
 pub use id::Id;
 #[cfg(feature = "text-accessibility")]

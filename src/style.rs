@@ -1,6 +1,6 @@
 use parley::{FontFamilyName, FontFeature, FontStyle, FontVariation, FontWeight, FontWidth};
 
-use super::{Error, ErrorCode, Result};
+use super::{Error, ErrorCode, ErrorDetail, NumericRequirement, Result};
 
 /// RGBA brush in text-space terms.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -413,13 +413,21 @@ fn validate_style(style: &Style) -> Result<ParsedStyle> {
         return Err(Error::new(
             ErrorCode::UnsupportedFeature,
             "explicit text direction is not supported until Parley exposes public base-direction controls",
-        ));
+        )
+        .with_detail(ErrorDetail::UnsupportedCombination {
+            feature: "text direction",
+            reason: "explicit text direction is not supported until Parley exposes public base-direction controls",
+        }));
     }
     if style.white_space != WhiteSpace::Preserve {
         return Err(Error::new(
             ErrorCode::UnsupportedFeature,
             "whitespace collapse is not supported until text layout preserves authored source ranges",
-        ));
+        )
+        .with_detail(ErrorDetail::UnsupportedCombination {
+            feature: "whitespace collapse",
+            reason: "whitespace collapse is not supported until text layout preserves authored source ranges",
+        }));
     }
     validate_positive_f32(style.size, "font size")?;
     validate_line_height(style.line_height)?;
@@ -493,7 +501,12 @@ fn validate_brush(brush: Brush, name: &str) -> Result<()> {
             return Err(Error::new(
                 ErrorCode::InvalidStyle,
                 format!("{name} {channel} channel must be finite and between 0 and 1"),
-            ));
+            )
+            .with_detail(ErrorDetail::InvalidNumericField {
+                field: brush_channel_field(name, channel),
+                value,
+                requirement: NumericRequirement::UnitInterval,
+            }));
         }
     }
     Ok(())
@@ -504,19 +517,64 @@ fn validate_positive_f32(value: f32, name: &str) -> Result<()> {
         return Err(Error::new(
             ErrorCode::InvalidStyle,
             format!("{name} must be finite and greater than 0"),
-        ));
+        )
+        .with_detail(ErrorDetail::InvalidNumericField {
+            field: numeric_field(name),
+            value,
+            requirement: NumericRequirement::FiniteGreaterThanZero,
+        }));
     }
     Ok(())
 }
 
 fn validate_finite_f32(value: f32, name: &str) -> Result<()> {
     if !value.is_finite() {
-        return Err(Error::new(
-            ErrorCode::InvalidStyle,
-            format!("{name} must be finite"),
-        ));
+        return Err(
+            Error::new(ErrorCode::InvalidStyle, format!("{name} must be finite")).with_detail(
+                ErrorDetail::InvalidNumericField {
+                    field: numeric_field(name),
+                    value,
+                    requirement: NumericRequirement::Finite,
+                },
+            ),
+        );
     }
     Ok(())
+}
+
+fn numeric_field(name: &str) -> &'static str {
+    match name {
+        "font size" => "font size",
+        "metrics-relative line height" => "metrics-relative line height",
+        "font-size-relative line height" => "font-size-relative line height",
+        "absolute line height" => "absolute line height",
+        "letter spacing" => "letter spacing",
+        "word spacing" => "word spacing",
+        "oblique angle" => "oblique angle",
+        "underline offset" => "underline offset",
+        "underline size" => "underline size",
+        "strikethrough offset" => "strikethrough offset",
+        "strikethrough size" => "strikethrough size",
+        _ => "numeric style field",
+    }
+}
+
+fn brush_channel_field(name: &str, channel: &str) -> &'static str {
+    match (name, channel) {
+        ("text brush", "red") => "text brush red channel",
+        ("text brush", "green") => "text brush green channel",
+        ("text brush", "blue") => "text brush blue channel",
+        ("text brush", "alpha") => "text brush alpha channel",
+        ("underline brush", "red") => "underline brush red channel",
+        ("underline brush", "green") => "underline brush green channel",
+        ("underline brush", "blue") => "underline brush blue channel",
+        ("underline brush", "alpha") => "underline brush alpha channel",
+        ("strikethrough brush", "red") => "strikethrough brush red channel",
+        ("strikethrough brush", "green") => "strikethrough brush green channel",
+        ("strikethrough brush", "blue") => "strikethrough brush blue channel",
+        ("strikethrough brush", "alpha") => "strikethrough brush alpha channel",
+        _ => "brush channel",
+    }
 }
 
 fn parse_language(locale: &str) -> Result<parley::Language> {

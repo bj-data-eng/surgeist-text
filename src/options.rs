@@ -1,4 +1,4 @@
-use super::{Error, ErrorCode, Result};
+use super::{Error, ErrorCode, ErrorDetail, NumericRequirement, Result};
 
 /// Paragraph-level layout options.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -118,7 +118,12 @@ fn validate_positive_f32(value: f32, name: &str) -> Result<()> {
         return Err(Error::new(
             ErrorCode::InvalidStyle,
             format!("{name} must be finite and greater than 0"),
-        ));
+        )
+        .with_detail(ErrorDetail::InvalidNumericField {
+            field: numeric_field(name),
+            value,
+            requirement: NumericRequirement::FiniteGreaterThanZero,
+        }));
     }
     Ok(())
 }
@@ -128,19 +133,38 @@ fn validate_non_negative_f32(value: f32, name: &str) -> Result<()> {
         return Err(Error::new(
             ErrorCode::InvalidStyle,
             format!("{name} must be finite and non-negative"),
-        ));
+        )
+        .with_detail(ErrorDetail::InvalidNumericField {
+            field: numeric_field(name),
+            value,
+            requirement: NumericRequirement::FiniteNonNegative,
+        }));
     }
     Ok(())
 }
 
 fn validate_finite_f32(value: f32, name: &str) -> Result<()> {
     if !value.is_finite() {
-        return Err(Error::new(
-            ErrorCode::InvalidStyle,
-            format!("{name} must be finite"),
-        ));
+        return Err(
+            Error::new(ErrorCode::InvalidStyle, format!("{name} must be finite")).with_detail(
+                ErrorDetail::InvalidNumericField {
+                    field: numeric_field(name),
+                    value,
+                    requirement: NumericRequirement::Finite,
+                },
+            ),
+        );
     }
     Ok(())
+}
+
+fn numeric_field(name: &str) -> &'static str {
+    match name {
+        "text scale" => "text scale",
+        "layout width" => "layout width",
+        "text indent" => "text indent",
+        _ => "numeric options field",
+    }
 }
 
 fn parley_indent_options(indent: Indent) -> Result<Option<(f32, parley::IndentOptions)>> {
@@ -154,7 +178,11 @@ fn parley_indent_options(indent: Indent) -> Result<Option<(f32, parley::IndentOp
         return Err(Error::new(
             ErrorCode::UnsupportedFeature,
             "each-line indent without first-line indent is not expressible through Parley",
-        ));
+        )
+        .with_detail(ErrorDetail::UnsupportedCombination {
+            feature: "text indent",
+            reason: "each-line indent without first-line indent is not expressible through Parley",
+        }));
     }
     Ok(Some((
         indent.amount,
