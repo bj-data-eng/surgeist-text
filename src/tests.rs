@@ -247,6 +247,41 @@ fn rejects_invalid_font_settings() {
 }
 
 #[test]
+fn validated_style_preserves_parsed_font_inputs() {
+    let style = Style {
+        font: Font::new()
+            .family("Arial")
+            .feature(r#""liga" on"#)
+            .variation(r#""wght" 700"#),
+        locale: Some("en-US".to_owned()),
+        ..Style::default()
+    };
+
+    let validated = ValidatedStyle::try_from(style).expect("style should validate");
+
+    assert_eq!(validated.font_families(), ["Arial".to_owned()]);
+    assert_eq!(validated.locale_tag(), Some("en-US"));
+    assert_eq!(validated.font_features(), [r#""liga" on"#.to_owned()]);
+    assert_eq!(validated.font_variations(), [r#""wght" 700"#.to_owned()]);
+    assert_eq!(
+        validated.authored().font.features,
+        [r#""liga" on"#.to_owned()]
+    );
+}
+
+#[test]
+fn validated_style_rejects_invalid_oblique_angle() {
+    let style = Style {
+        font: Font::new().style(Slant::Oblique(Some(f32::NAN))),
+        ..Style::default()
+    };
+
+    let error = ValidatedStyle::try_from(style).expect_err("invalid oblique angle should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+}
+
+#[test]
 fn default_style_preserves_authored_whitespace() {
     assert_eq!(Style::default().white_space, WhiteSpace::Preserve);
 }
@@ -348,6 +383,23 @@ fn rejects_each_line_indent_without_first_line_scope() {
     let error = builder
         .build()
         .expect_err("unsupported indent combination should fail");
+
+    assert_eq!(error.code, ErrorCode::UnsupportedFeature);
+}
+
+#[test]
+fn validated_options_reject_unsupported_indent_shape() {
+    let options = Options {
+        indent: Indent {
+            amount: 10.0,
+            first_line: false,
+            each_line: true,
+            hanging: false,
+        },
+        ..Options::default()
+    };
+
+    let error = ValidatedOptions::try_from(options).expect_err("unsupported shape should fail");
 
     assert_eq!(error.code, ErrorCode::UnsupportedFeature);
 }

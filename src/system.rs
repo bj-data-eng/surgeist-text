@@ -1,13 +1,13 @@
 use std::{borrow::Cow, collections::HashMap, ops::Range as StdRange};
 
 use parley::{
-    AlignmentOptions, FontContext, FontFamily, FontFamilyName, FontFeature, FontFeatures,
-    FontVariation, FontVariations, GenericFamily, Language, LayoutContext, StyleProperty,
+    AlignmentOptions, FontContext, FontFamily, FontFeatures, FontVariations, GenericFamily,
+    LayoutContext, StyleProperty,
 };
 
 use super::{
-    Brush, Decoration, Direction, Error, ErrorCode, Id, Indent, InlineBox, Key, Layout, LineHeight,
-    Options, Range, Result, Source, Span, Stats, Style, WhiteSpace, range,
+    Brush, Id, InlineBox, Key, Layout, Options, Range, Result, Source, Span, Stats, Style,
+    ValidatedOptions, ValidatedStyle, range,
 };
 
 /// Shared font and layout system.
@@ -108,17 +108,20 @@ impl Builder<'_> {
 
     pub fn build(&mut self) -> Result<Layout> {
         validate_source(&self.source)?;
-        validate_options(&self.options)?;
-        validate_style(&self.default_style)?;
-        for span in &self.source.spans {
-            validate_style(&span.style)?;
-        }
+        let validated_options = ValidatedOptions::try_from(self.options)?;
+        let default_style = ValidatedStyle::try_from(self.default_style.clone())?;
+        let span_styles = self
+            .source
+            .spans
+            .iter()
+            .map(|span| Ok((span.range, ValidatedStyle::try_from(span.style.clone())?)))
+            .collect::<Result<Vec<_>>>()?;
         let layout_source = self.source.clone();
 
         let key = Key::from_parts(
             &self.source,
-            &self.default_style,
-            self.options,
+            default_style.authored(),
+            validated_options.authored(),
             self.system.font_generation,
         );
         if let Some(layout) = self.system.cache.get(&key) {
@@ -129,13 +132,13 @@ impl Builder<'_> {
         let mut builder = self.system.layout_context.ranged_builder(
             &mut self.system.font_context,
             &layout_source.text,
-            self.options.scale,
-            self.options.quantize,
+            validated_options.authored().scale,
+            validated_options.authored().quantize,
         );
 
-        push_style_defaults(&mut builder, &self.default_style)?;
-        for span in &layout_source.spans {
-            push_style_span(&mut builder, span)?;
+        push_style_defaults(&mut builder, &default_style);
+        for (range, style) in &span_styles {
+            push_style_span(&mut builder, *range, style);
         }
         for box_ in &layout_source.boxes {
             builder.push_inline_box(parley::InlineBox {
@@ -148,11 +151,14 @@ impl Builder<'_> {
         }
 
         let mut layout = builder.build(&layout_source.text);
-        if let Some((amount, indent_options)) = parley_indent_options(self.options.indent)? {
+        if let Some((amount, indent_options)) = validated_options.parley_indent() {
             layout.set_text_indent(amount, indent_options);
         }
-        layout.break_all_lines(self.options.width);
-        layout.align(self.options.alignment.into(), AlignmentOptions::default());
+        layout.break_all_lines(validated_options.authored().width);
+        layout.align(
+            validated_options.authored().alignment.into(),
+            AlignmentOptions::default(),
+        );
 
         self.system.stats.layout_misses = self.system.stats.layout_misses.saturating_add(1);
 
@@ -177,252 +183,23 @@ fn validate_source(source: &Source) -> Result<()> {
     Ok(())
 }
 
-fn validate_options(options: &Options) -> Result<()> {
-    validate_positive_f32(options.scale, "text scale")?;
-    if let Some(width) = options.width {
-        validate_non_negative_f32(width, "layout width")?;
-    }
-    validate_finite_f32(options.indent.amount, "text indent")?;
-    Ok(())
-}
-
-fn validate_style(style: &Style) -> Result<()> {
-    if style.direction != Direction::Auto {
-        return Err(Error::new(
-            ErrorCode::UnsupportedFeature,
-            "explicit text direction is not supported until Parley exposes public base-direction controls",
-        ));
-    }
-    if style.white_space != WhiteSpace::Preserve {
-        return Err(Error::new(
-            ErrorCode::UnsupportedFeature,
-            "whitespace collapse is not supported until text layout preserves authored source ranges",
-        ));
-    }
-    validate_positive_f32(style.size, "font size")?;
-    validate_line_height(style.line_height)?;
-    validate_finite_f32(style.letter_spacing, "letter spacing")?;
-    validate_finite_f32(style.word_spacing, "word spacing")?;
-    validate_brush(style.brush, "text brush")?;
-    validate_decoration(style.underline, "underline")?;
-    validate_decoration(style.strikethrough, "strikethrough")?;
-    if let Some(locale) = &style.locale {
-        parse_language(locale)?;
-    }
-    parse_font_families(&style.font.family)?;
-    if let Some(features) = font_settings_source(&style.font.features) {
-        validate_font_features(&features)?;
-    }
-    if let Some(variations) = font_settings_source(&style.font.variations) {
-        validate_font_variations(&variations)?;
-    }
-    Ok(())
-}
-
-fn validate_line_height(line_height: LineHeight) -> Result<()> {
-    match line_height {
-        LineHeight::MetricsRelative(value) => {
-            validate_positive_f32(value, "metrics-relative line height")
-        }
-        LineHeight::FontSizeRelative(value) => {
-            validate_positive_f32(value, "font-size-relative line height")
-        }
-        LineHeight::Absolute(value) => validate_positive_f32(value, "absolute line height"),
-    }
-}
-
-fn validate_decoration(decoration: Decoration, name: &str) -> Result<()> {
-    if !decoration.enabled {
-        return Ok(());
-    }
-    if let Some(offset) = decoration.offset {
-        validate_finite_f32(offset, &format!("{name} offset"))?;
-    }
-    if let Some(size) = decoration.size {
-        validate_positive_f32(size, &format!("{name} size"))?;
-    }
-    if let Some(brush) = decoration.brush {
-        validate_brush(brush, &format!("{name} brush"))?;
-    }
-    Ok(())
-}
-
-fn validate_brush(brush: Brush, name: &str) -> Result<()> {
-    for (channel, value) in [
-        ("red", brush.r),
-        ("green", brush.g),
-        ("blue", brush.b),
-        ("alpha", brush.a),
-    ] {
-        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-            return Err(Error::new(
-                ErrorCode::InvalidStyle,
-                format!("{name} {channel} channel must be finite and between 0 and 1"),
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn validate_positive_f32(value: f32, name: &str) -> Result<()> {
-    if !value.is_finite() || value <= 0.0 {
-        return Err(Error::new(
-            ErrorCode::InvalidStyle,
-            format!("{name} must be finite and greater than 0"),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_non_negative_f32(value: f32, name: &str) -> Result<()> {
-    if !value.is_finite() || value < 0.0 {
-        return Err(Error::new(
-            ErrorCode::InvalidStyle,
-            format!("{name} must be finite and non-negative"),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_finite_f32(value: f32, name: &str) -> Result<()> {
-    if !value.is_finite() {
-        return Err(Error::new(
-            ErrorCode::InvalidStyle,
-            format!("{name} must be finite"),
-        ));
-    }
-    Ok(())
-}
-
-fn parse_language(locale: &str) -> Result<Language> {
-    Language::parse(locale).map_err(|_| {
-        Error::new(
-            ErrorCode::InvalidStyle,
-            format!("locale {locale:?} is not a valid BCP 47 language tag"),
-        )
-    })
-}
-
-fn parse_font_families(families: &[String]) -> Result<Option<Vec<FontFamilyName<'static>>>> {
-    if families.is_empty() {
-        return Ok(None);
-    }
-    let mut parsed = Vec::with_capacity(families.len());
-    for family in families {
-        if family.trim().is_empty() {
-            return Err(Error::new(
-                ErrorCode::InvalidStyle,
-                "font family names must not be empty",
-            ));
-        }
-        let family = FontFamilyName::parse(family).ok_or_else(|| {
-            Error::new(
-                ErrorCode::InvalidStyle,
-                format!("font family {family:?} is not valid CSS font-family syntax"),
-            )
-        })?;
-        parsed.push(family.into_owned());
-    }
-    Ok(Some(parsed))
-}
-
-fn font_settings_source(settings: &[String]) -> Option<String> {
-    if settings.is_empty() {
-        return None;
-    }
-    Some(settings.join(", "))
-}
-
-fn validate_font_features(source: &str) -> Result<()> {
-    if source.trim().is_empty() {
-        return Err(Error::new(
-            ErrorCode::InvalidStyle,
-            "font feature settings must not be empty",
-        ));
-    }
-    let mut count = 0;
-    for feature in FontFeature::parse_css_list(source) {
-        feature.map_err(|error| {
-            Error::new(
-                ErrorCode::InvalidStyle,
-                format!("font feature settings {source:?} are invalid: {error}"),
-            )
-        })?;
-        count += 1;
-    }
-    if count == 0 {
-        return Err(Error::new(
-            ErrorCode::InvalidStyle,
-            "font feature settings must contain at least one setting",
-        ));
-    }
-    Ok(())
-}
-
-fn validate_font_variations(source: &str) -> Result<()> {
-    if source.trim().is_empty() {
-        return Err(Error::new(
-            ErrorCode::InvalidStyle,
-            "font variation settings must not be empty",
-        ));
-    }
-    let mut count = 0;
-    for variation in FontVariation::parse_css_list(source) {
-        variation.map_err(|error| {
-            Error::new(
-                ErrorCode::InvalidStyle,
-                format!("font variation settings {source:?} are invalid: {error}"),
-            )
-        })?;
-        count += 1;
-    }
-    if count == 0 {
-        return Err(Error::new(
-            ErrorCode::InvalidStyle,
-            "font variation settings must contain at least one setting",
-        ));
-    }
-    Ok(())
-}
-
-fn parley_indent_options(indent: Indent) -> Result<Option<(f32, parley::IndentOptions)>> {
-    if indent.amount == 0.0 {
-        return Ok(None);
-    }
-    if !indent.first_line && !indent.each_line && !indent.hanging {
-        return Ok(None);
-    }
-    if !indent.first_line && indent.each_line && !indent.hanging {
-        return Err(Error::new(
-            ErrorCode::UnsupportedFeature,
-            "each-line indent without first-line indent is not expressible through Parley",
-        ));
-    }
-    Ok(Some((
-        indent.amount,
-        parley::IndentOptions {
-            each_line: indent.each_line,
-            hanging: indent.hanging,
-        },
-    )))
-}
-
-fn push_style_defaults(
-    builder: &mut parley::RangedBuilder<'_, Brush>,
-    style: &Style,
-) -> Result<()> {
+fn push_style_defaults(builder: &mut parley::RangedBuilder<'_, Brush>, style: &ValidatedStyle) {
     push_style_properties(builder, style, None)
 }
 
-fn push_style_span(builder: &mut parley::RangedBuilder<'_, Brush>, span: &Span) -> Result<()> {
-    push_style_properties(builder, &span.style, Some(span.range.into()))
+fn push_style_span(
+    builder: &mut parley::RangedBuilder<'_, Brush>,
+    range: Range,
+    style: &ValidatedStyle,
+) {
+    push_style_properties(builder, style, Some(range.into()))
 }
 
 fn push_style_properties(
     builder: &mut parley::RangedBuilder<'_, Brush>,
-    style: &Style,
+    style: &ValidatedStyle,
     range: Option<StdRange<usize>>,
-) -> Result<()> {
+) {
     let mut push = |property: StyleProperty<'static, Brush>| {
         if let Some(range) = range.clone() {
             builder.push(property, range);
@@ -430,47 +207,53 @@ fn push_style_properties(
             builder.push_default(property);
         }
     };
+    let authored = style.authored();
 
-    let family = parse_font_families(&style.font.family)?
+    let family = style
+        .parley_font_family()
         .map_or(FontFamily::from(GenericFamily::SansSerif), |families| {
-            FontFamily::List(Cow::Owned(families))
+            FontFamily::List(Cow::Owned(families.to_vec()))
         });
 
     push(StyleProperty::FontFamily(family));
-    push(StyleProperty::FontSize(style.size));
-    push(StyleProperty::FontWeight(style.font.weight.into()));
-    push(StyleProperty::FontWidth(style.font.width.into()));
-    push(StyleProperty::FontStyle(style.font.slant.into()));
+    push(StyleProperty::FontSize(authored.size));
+    push(StyleProperty::FontWeight(authored.font.weight.into()));
+    push(StyleProperty::FontWidth(authored.font.width.into()));
+    push(StyleProperty::FontStyle(authored.font.slant.into()));
     push(StyleProperty::FontFeatures(
-        font_settings_source(&style.font.features).map_or_else(FontFeatures::empty, |features| {
-            FontFeatures::Source(Cow::Owned(features))
-        }),
-    ));
-    push(StyleProperty::FontVariations(
-        font_settings_source(&style.font.variations)
-            .map_or_else(FontVariations::empty, |variations| {
-                FontVariations::Source(Cow::Owned(variations))
+        style
+            .parley_font_features()
+            .map_or_else(FontFeatures::empty, |features| {
+                FontFeatures::Source(Cow::Owned(features.to_owned()))
             }),
     ));
-    push(StyleProperty::Locale(
-        style.locale.as_deref().map(parse_language).transpose()?,
+    push(StyleProperty::FontVariations(
+        style
+            .parley_font_variations()
+            .map_or_else(FontVariations::empty, |variations| {
+                FontVariations::Source(Cow::Owned(variations.to_owned()))
+            }),
     ));
-    push(StyleProperty::Brush(style.brush));
-    push(StyleProperty::LineHeight(style.line_height.into()));
-    push(StyleProperty::LetterSpacing(style.letter_spacing));
-    push(StyleProperty::WordSpacing(style.word_spacing));
-    push(StyleProperty::WordBreak(style.word_break.into()));
-    push(StyleProperty::OverflowWrap(style.overflow_wrap.into()));
-    push(StyleProperty::TextWrapMode(style.wrap.into()));
-    push(StyleProperty::Underline(style.underline.enabled));
-    push(StyleProperty::UnderlineOffset(style.underline.offset));
-    push(StyleProperty::UnderlineSize(style.underline.size));
-    push(StyleProperty::UnderlineBrush(style.underline.brush));
-    push(StyleProperty::Strikethrough(style.strikethrough.enabled));
+    push(StyleProperty::Locale(style.parley_locale()));
+    push(StyleProperty::Brush(authored.brush));
+    push(StyleProperty::LineHeight(authored.line_height.into()));
+    push(StyleProperty::LetterSpacing(authored.letter_spacing));
+    push(StyleProperty::WordSpacing(authored.word_spacing));
+    push(StyleProperty::WordBreak(authored.word_break.into()));
+    push(StyleProperty::OverflowWrap(authored.overflow_wrap.into()));
+    push(StyleProperty::TextWrapMode(authored.wrap.into()));
+    push(StyleProperty::Underline(authored.underline.enabled));
+    push(StyleProperty::UnderlineOffset(authored.underline.offset));
+    push(StyleProperty::UnderlineSize(authored.underline.size));
+    push(StyleProperty::UnderlineBrush(authored.underline.brush));
+    push(StyleProperty::Strikethrough(authored.strikethrough.enabled));
     push(StyleProperty::StrikethroughOffset(
-        style.strikethrough.offset,
+        authored.strikethrough.offset,
     ));
-    push(StyleProperty::StrikethroughSize(style.strikethrough.size));
-    push(StyleProperty::StrikethroughBrush(style.strikethrough.brush));
-    Ok(())
+    push(StyleProperty::StrikethroughSize(
+        authored.strikethrough.size,
+    ));
+    push(StyleProperty::StrikethroughBrush(
+        authored.strikethrough.brush,
+    ));
 }

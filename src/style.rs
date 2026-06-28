@@ -1,4 +1,6 @@
-use parley::{FontStyle, FontWeight, FontWidth};
+use parley::{FontFamilyName, FontFeature, FontStyle, FontVariation, FontWeight, FontWidth};
+
+use super::{Error, ErrorCode, Result};
 
 /// RGBA brush in text-space terms.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -313,4 +315,297 @@ impl Default for Decoration {
     fn default() -> Self {
         Self::none()
     }
+}
+
+/// Validated style input with parsed Parley projection data.
+#[derive(Clone, Debug)]
+pub struct ValidatedStyle {
+    authored: Style,
+    locale: Option<parley::Language>,
+    font_family: Option<Vec<parley::FontFamilyName<'static>>>,
+    font_features: Option<String>,
+    font_variations: Option<String>,
+}
+
+impl ValidatedStyle {
+    fn new(
+        authored: Style,
+        locale: Option<parley::Language>,
+        font_family: Option<Vec<parley::FontFamilyName<'static>>>,
+        font_features: Option<String>,
+        font_variations: Option<String>,
+    ) -> Self {
+        Self {
+            authored,
+            locale,
+            font_family,
+            font_features,
+            font_variations,
+        }
+    }
+
+    #[must_use]
+    pub const fn authored(&self) -> &Style {
+        &self.authored
+    }
+
+    #[must_use]
+    pub fn locale_tag(&self) -> Option<&str> {
+        self.authored.locale.as_deref()
+    }
+
+    #[must_use]
+    pub fn font_families(&self) -> &[String] {
+        &self.authored.font.family
+    }
+
+    #[must_use]
+    pub fn font_features(&self) -> &[String] {
+        &self.authored.font.features
+    }
+
+    #[must_use]
+    pub fn font_variations(&self) -> &[String] {
+        &self.authored.font.variations
+    }
+
+    pub(crate) const fn parley_locale(&self) -> Option<parley::Language> {
+        self.locale
+    }
+
+    pub(crate) fn parley_font_family(&self) -> Option<&[parley::FontFamilyName<'static>]> {
+        self.font_family.as_deref()
+    }
+
+    pub(crate) fn parley_font_features(&self) -> Option<&str> {
+        self.font_features.as_deref()
+    }
+
+    pub(crate) fn parley_font_variations(&self) -> Option<&str> {
+        self.font_variations.as_deref()
+    }
+}
+
+impl TryFrom<Style> for ValidatedStyle {
+    type Error = Error;
+
+    fn try_from(style: Style) -> Result<Self> {
+        let parsed = validate_style(&style)?;
+        Ok(Self::new(
+            style,
+            parsed.locale,
+            parsed.font_family,
+            parsed.font_features,
+            parsed.font_variations,
+        ))
+    }
+}
+
+struct ParsedStyle {
+    locale: Option<parley::Language>,
+    font_family: Option<Vec<parley::FontFamilyName<'static>>>,
+    font_features: Option<String>,
+    font_variations: Option<String>,
+}
+
+fn validate_style(style: &Style) -> Result<ParsedStyle> {
+    if style.direction != Direction::Auto {
+        return Err(Error::new(
+            ErrorCode::UnsupportedFeature,
+            "explicit text direction is not supported until Parley exposes public base-direction controls",
+        ));
+    }
+    if style.white_space != WhiteSpace::Preserve {
+        return Err(Error::new(
+            ErrorCode::UnsupportedFeature,
+            "whitespace collapse is not supported until text layout preserves authored source ranges",
+        ));
+    }
+    validate_positive_f32(style.size, "font size")?;
+    validate_line_height(style.line_height)?;
+    validate_finite_f32(style.letter_spacing, "letter spacing")?;
+    validate_finite_f32(style.word_spacing, "word spacing")?;
+    validate_slant(style.font.slant)?;
+    validate_brush(style.brush, "text brush")?;
+    validate_decoration(style.underline, "underline")?;
+    validate_decoration(style.strikethrough, "strikethrough")?;
+    let locale = style.locale.as_deref().map(parse_language).transpose()?;
+    let font_family = parse_font_families(&style.font.family)?;
+    let font_features = font_settings_source(&style.font.features);
+    if let Some(features) = &font_features {
+        validate_font_features(features)?;
+    }
+    let font_variations = font_settings_source(&style.font.variations);
+    if let Some(variations) = &font_variations {
+        validate_font_variations(variations)?;
+    }
+    Ok(ParsedStyle {
+        locale,
+        font_family,
+        font_features,
+        font_variations,
+    })
+}
+
+fn validate_line_height(line_height: LineHeight) -> Result<()> {
+    match line_height {
+        LineHeight::MetricsRelative(value) => {
+            validate_positive_f32(value, "metrics-relative line height")
+        }
+        LineHeight::FontSizeRelative(value) => {
+            validate_positive_f32(value, "font-size-relative line height")
+        }
+        LineHeight::Absolute(value) => validate_positive_f32(value, "absolute line height"),
+    }
+}
+
+fn validate_slant(slant: Slant) -> Result<()> {
+    if let Slant::Oblique(Some(angle)) = slant {
+        validate_finite_f32(angle, "oblique angle")?;
+    }
+    Ok(())
+}
+
+fn validate_decoration(decoration: Decoration, name: &str) -> Result<()> {
+    if !decoration.enabled {
+        return Ok(());
+    }
+    if let Some(offset) = decoration.offset {
+        validate_finite_f32(offset, &format!("{name} offset"))?;
+    }
+    if let Some(size) = decoration.size {
+        validate_positive_f32(size, &format!("{name} size"))?;
+    }
+    if let Some(brush) = decoration.brush {
+        validate_brush(brush, &format!("{name} brush"))?;
+    }
+    Ok(())
+}
+
+fn validate_brush(brush: Brush, name: &str) -> Result<()> {
+    for (channel, value) in [
+        ("red", brush.r),
+        ("green", brush.g),
+        ("blue", brush.b),
+        ("alpha", brush.a),
+    ] {
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err(Error::new(
+                ErrorCode::InvalidStyle,
+                format!("{name} {channel} channel must be finite and between 0 and 1"),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_positive_f32(value: f32, name: &str) -> Result<()> {
+    if !value.is_finite() || value <= 0.0 {
+        return Err(Error::new(
+            ErrorCode::InvalidStyle,
+            format!("{name} must be finite and greater than 0"),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_finite_f32(value: f32, name: &str) -> Result<()> {
+    if !value.is_finite() {
+        return Err(Error::new(
+            ErrorCode::InvalidStyle,
+            format!("{name} must be finite"),
+        ));
+    }
+    Ok(())
+}
+
+fn parse_language(locale: &str) -> Result<parley::Language> {
+    parley::Language::parse(locale).map_err(|_| {
+        Error::new(
+            ErrorCode::InvalidStyle,
+            format!("locale {locale:?} is not a valid BCP 47 language tag"),
+        )
+    })
+}
+
+fn parse_font_families(families: &[String]) -> Result<Option<Vec<FontFamilyName<'static>>>> {
+    if families.is_empty() {
+        return Ok(None);
+    }
+    let mut parsed = Vec::with_capacity(families.len());
+    for family in families {
+        if family.trim().is_empty() {
+            return Err(Error::new(
+                ErrorCode::InvalidStyle,
+                "font family names must not be empty",
+            ));
+        }
+        let family = FontFamilyName::parse(family).ok_or_else(|| {
+            Error::new(
+                ErrorCode::InvalidStyle,
+                format!("font family {family:?} is not valid CSS font-family syntax"),
+            )
+        })?;
+        parsed.push(family.into_owned());
+    }
+    Ok(Some(parsed))
+}
+
+fn font_settings_source(settings: &[String]) -> Option<String> {
+    if settings.is_empty() {
+        return None;
+    }
+    Some(settings.join(", "))
+}
+
+fn validate_font_features(source: &str) -> Result<()> {
+    if source.trim().is_empty() {
+        return Err(Error::new(
+            ErrorCode::InvalidStyle,
+            "font feature settings must not be empty",
+        ));
+    }
+    let mut count = 0;
+    for feature in FontFeature::parse_css_list(source) {
+        feature.map_err(|error| {
+            Error::new(
+                ErrorCode::InvalidStyle,
+                format!("font feature settings {source:?} are invalid: {error}"),
+            )
+        })?;
+        count += 1;
+    }
+    if count == 0 {
+        return Err(Error::new(
+            ErrorCode::InvalidStyle,
+            "font feature settings must contain at least one setting",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_font_variations(source: &str) -> Result<()> {
+    if source.trim().is_empty() {
+        return Err(Error::new(
+            ErrorCode::InvalidStyle,
+            "font variation settings must not be empty",
+        ));
+    }
+    let mut count = 0;
+    for variation in FontVariation::parse_css_list(source) {
+        variation.map_err(|error| {
+            Error::new(
+                ErrorCode::InvalidStyle,
+                format!("font variation settings {source:?} are invalid: {error}"),
+            )
+        })?;
+        count += 1;
+    }
+    if count == 0 {
+        return Err(Error::new(
+            ErrorCode::InvalidStyle,
+            "font variation settings must contain at least one setting",
+        ));
+    }
+    Ok(())
 }

@@ -30,12 +30,12 @@ pub use layout::{
     FontRef, Glyph, Hit, Layout, Line, Metrics, Movement, PositionedInlineBox, Run, Selection,
     SelectionGeometry, SelectionRect,
 };
-pub use options::{Alignment, Indent, Options};
+pub use options::{Alignment, Indent, Options, ValidatedOptions};
 pub use range::{Range, SourcePosition, SourceRange};
 pub use source_model::{InlineBox, InlineBoxKind, Source, Span};
 pub use style::{
-    Brush, Decoration, Direction, Font, LineHeight, OverflowWrap, Slant, Style, Weight, WhiteSpace,
-    Width, WordBreak, Wrap,
+    Brush, Decoration, Direction, Font, LineHeight, OverflowWrap, Slant, Style, ValidatedStyle,
+    Weight, WhiteSpace, Width, WordBreak, Wrap,
 };
 pub use system::{Builder, System, SystemOptions};
 
