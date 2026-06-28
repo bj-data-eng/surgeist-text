@@ -28,10 +28,48 @@ impl FontGeneration {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Stats {
-    pub layout_hits: usize,
-    pub layout_misses: usize,
-    pub font_refreshes: usize,
-    pub invalidations: usize,
+    layout_hits: usize,
+    layout_misses: usize,
+    font_refreshes: usize,
+    invalidations: usize,
+}
+
+impl Stats {
+    #[must_use]
+    pub const fn layout_hits(self) -> usize {
+        self.layout_hits
+    }
+
+    #[must_use]
+    pub const fn layout_misses(self) -> usize {
+        self.layout_misses
+    }
+
+    #[must_use]
+    pub const fn font_refreshes(self) -> usize {
+        self.font_refreshes
+    }
+
+    #[must_use]
+    pub const fn invalidations(self) -> usize {
+        self.invalidations
+    }
+
+    pub(crate) fn record_layout_hit(&mut self) {
+        self.layout_hits = self.layout_hits.saturating_add(1);
+    }
+
+    pub(crate) fn record_layout_miss(&mut self) {
+        self.layout_misses = self.layout_misses.saturating_add(1);
+    }
+
+    pub(crate) fn record_font_refresh(&mut self) {
+        self.font_refreshes = self.font_refreshes.saturating_add(1);
+    }
+
+    pub(crate) fn record_invalidations(&mut self, count: usize) {
+        self.invalidations = self.invalidations.saturating_add(count);
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

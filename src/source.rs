@@ -114,11 +114,11 @@ fn validate_source(source: &Source) -> Result<Vec<ValidatedSpan>> {
 /// Text source plus resolved style spans and inline boxes.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Source {
-    pub id: Option<Id>,
-    pub revision: u64,
-    pub text: String,
-    pub spans: Vec<Span>,
-    pub boxes: Vec<InlineBox>,
+    pub(crate) id: Option<Id>,
+    pub(crate) revision: u64,
+    pub(crate) text: String,
+    pub(crate) spans: Vec<Span>,
+    pub(crate) boxes: Vec<InlineBox>,
 }
 
 impl Source {
@@ -195,8 +195,8 @@ impl Source {
 /// Style override for one source range.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Span {
-    pub range: Range,
-    pub style: Style,
+    pub(crate) range: Range,
+    pub(crate) style: Style,
 }
 
 impl Span {
@@ -204,15 +204,25 @@ impl Span {
     pub const fn new(range: Range, style: Style) -> Self {
         Self { range, style }
     }
+
+    #[must_use]
+    pub const fn range(&self) -> Range {
+        self.range
+    }
+
+    #[must_use]
+    pub const fn style(&self) -> &Style {
+        &self.style
+    }
 }
 
 /// A box laid out with text.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct InlineBox {
-    pub id: Id,
-    pub kind: InlineBoxKind,
-    pub index: usize,
-    pub size: Size,
+    pub(crate) id: Id,
+    pub(crate) kind: InlineBoxKind,
+    pub(crate) index: usize,
+    pub(crate) size: Size,
 }
 
 impl InlineBox {
@@ -224,6 +234,26 @@ impl InlineBox {
             index,
             size,
         }
+    }
+
+    #[must_use]
+    pub const fn id(self) -> Id {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> InlineBoxKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self.index
+    }
+
+    #[must_use]
+    pub const fn size(self) -> Size {
+        self.size
     }
 }
 

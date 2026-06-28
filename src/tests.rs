@@ -133,7 +133,7 @@ fn builds_plain_text_layout() {
 
     let layout = builder.build().expect("layout should build");
 
-    assert_eq!(layout.metrics().line_count, 1);
+    assert_eq!(layout.metrics().line_count(), 1);
     assert!(!layout.glyph_runs().is_empty());
 }
 
@@ -152,8 +152,8 @@ fn wrap_none_preserves_single_visual_line() {
 
     let layout = builder.build().expect("nowrap layout should build");
 
-    assert_eq!(layout.metrics().line_count, 1);
-    assert!(layout.metrics().overflow);
+    assert_eq!(layout.metrics().line_count(), 1);
+    assert!(layout.metrics().overflow());
 }
 
 #[test]
@@ -177,8 +177,8 @@ fn overflow_wrap_anywhere_breaks_unspaced_text() {
 
     let anywhere = anywhere.build().expect("anywhere layout should build");
 
-    assert_eq!(normal.metrics().line_count, 1);
-    assert!(anywhere.metrics().line_count > 1);
+    assert_eq!(normal.metrics().line_count(), 1);
+    assert!(anywhere.metrics().line_count() > 1);
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn passes_valid_locale_to_parley() {
 
     let layout = builder.build().expect("valid locale should build");
 
-    assert_eq!(layout.metrics().line_count, 1);
+    assert_eq!(layout.metrics().line_count(), 1);
 }
 
 #[test]
@@ -227,7 +227,7 @@ fn passes_font_fallbacks_features_and_variations_to_parley() {
 
     let layout = builder.build().expect("valid font settings should build");
 
-    assert_eq!(layout.metrics().line_count, 1);
+    assert_eq!(layout.metrics().line_count(), 1);
 }
 
 #[test]
@@ -378,8 +378,8 @@ fn first_line_indent_offsets_first_line() {
     let first = layout.cursor(Cursor::new(0, Affinity::After));
     let second = layout.cursor(Cursor::new(6, Affinity::After));
 
-    assert!(first.rect.origin.x >= 9.0);
-    assert!(second.rect.origin.x < 1.0);
+    assert!(first.rect().origin.x >= 9.0);
+    assert!(second.rect().origin.x < 1.0);
 }
 
 #[test]
@@ -398,7 +398,14 @@ fn first_line_false_without_other_scope_skips_indent() {
 
     let layout = builder.build().expect("layout should build");
 
-    assert!(layout.cursor(Cursor::new(0, Affinity::After)).rect.origin.x < 1.0);
+    assert!(
+        layout
+            .cursor(Cursor::new(0, Affinity::After))
+            .rect()
+            .origin
+            .x
+            < 1.0
+    );
 }
 
 #[test]
@@ -480,8 +487,8 @@ fn repeated_layout_uses_cache() {
         .expect("second layout should build from cache");
 
     assert_eq!(first.key(), second.key());
-    assert_eq!(system.stats().layout_misses, 1);
-    assert_eq!(system.stats().layout_hits, 1);
+    assert_eq!(system.stats().layout_misses(), 1);
+    assert_eq!(system.stats().layout_hits(), 1);
 }
 
 #[test]
@@ -545,8 +552,34 @@ fn source_identity_and_revision_participate_in_cache_key() {
     assert_eq!(second_layout.key().source().id(), Some(Id::from_u64(42)));
     assert_eq!(second_layout.key().source().revision().get(), 2);
     assert_ne!(first_layout.key(), second_layout.key());
-    assert_eq!(system.stats().layout_misses, 2);
-    assert_eq!(system.stats().layout_hits, 0);
+    assert_eq!(system.stats().layout_misses(), 2);
+    assert_eq!(system.stats().layout_hits(), 0);
+}
+
+#[test]
+fn projection_outputs_expose_semantic_accessors() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    let layout = builder.build().expect("layout should build");
+
+    let metrics = layout.metrics();
+    let line = layout.lines().into_iter().next().expect("line exists");
+    let run = layout.glyph_runs().into_iter().next().expect("run exists");
+
+    assert_eq!(metrics.line_count(), 1);
+    assert_eq!(line.range(), Range::new(0, 5));
+    assert!(run.font_size().is_finite());
+}
+
+#[test]
+fn cache_stats_expose_counters_without_field_access() {
+    let mut system = System::default();
+    system.builder("hello").build().expect("layout builds");
+
+    let stats = system.stats();
+
+    assert_eq!(stats.layout_misses(), 1);
+    assert_eq!(stats.layout_hits(), 0);
 }
 
 #[test]
@@ -584,8 +617,8 @@ fn style_span_changes_cache_key() {
     let second_layout = second.build().expect("second layout should build");
 
     assert_ne!(first_layout.key(), second_layout.key());
-    assert_eq!(system.stats().layout_misses, 2);
-    assert_eq!(system.stats().layout_hits, 0);
+    assert_eq!(system.stats().layout_misses(), 2);
+    assert_eq!(system.stats().layout_hits(), 0);
 }
 
 #[test]
@@ -611,14 +644,14 @@ fn overlapping_spans_resolve_in_declaration_order() {
         .glyph_runs()
         .into_iter()
         .find(|run| {
-            run.glyphs
+            run.glyphs()
                 .iter()
-                .any(|glyph| glyph.range == Range::new(1, 2))
+                .any(|glyph| glyph.range() == Range::new(1, 2))
         })
         .expect("overlap glyph run should exist");
 
-    assert_eq!(overlap_run.brush, second_brush);
-    assert_eq!(overlap_run.style.brush, second_brush);
+    assert_eq!(overlap_run.brush(), second_brush);
+    assert_eq!(overlap_run.style().brush, second_brush);
 }
 
 #[test]
@@ -635,10 +668,10 @@ fn font_refresh_invalidates_cached_layouts() {
         .build()
         .expect("layout after refresh should build");
 
-    assert_eq!(system.stats().font_refreshes, 1);
-    assert_eq!(system.stats().invalidations, 1);
-    assert_eq!(system.stats().layout_misses, 2);
-    assert_eq!(system.stats().layout_hits, 0);
+    assert_eq!(system.stats().font_refreshes(), 1);
+    assert_eq!(system.stats().invalidations(), 1);
+    assert_eq!(system.stats().layout_misses(), 2);
+    assert_eq!(system.stats().layout_hits(), 0);
 }
 
 #[test]
@@ -652,7 +685,7 @@ fn selection_geometry_for_non_empty_range() {
         Cursor::new(5, Affinity::Before),
     );
 
-    assert!(!layout.selection(selection).rects.is_empty());
+    assert!(!layout.selection(selection).rects().is_empty());
 }
 
 #[test]
@@ -671,7 +704,7 @@ fn selection_geometry_for_multi_line_range() {
     let geometry = layout.selection(selection);
 
     assert!(
-        geometry.rects.len() >= 2,
+        geometry.rects().len() >= 2,
         "wrapped selection should produce geometry on multiple lines"
     );
 }
@@ -683,7 +716,7 @@ fn cursor_geometry_for_empty_text() {
     let layout = builder.build().expect("empty layout should build");
     let cursor = layout.cursor(Cursor::new(0, Affinity::After));
 
-    assert!(cursor.rect.size.height > 0.0);
+    assert!(cursor.rect().size.height > 0.0);
 }
 
 #[test]
@@ -694,10 +727,10 @@ fn cursor_geometry_for_bidi_boundary() {
     let before_rtl = layout.cursor(Cursor::new(4, Affinity::After));
     let after_rtl = layout.cursor(Cursor::new("abc שלום".len(), Affinity::Before));
 
-    assert!(before_rtl.rect.size.height > 0.0);
-    assert!(after_rtl.rect.size.height > 0.0);
-    assert!(before_rtl.rect.origin.x.is_finite());
-    assert!(after_rtl.rect.origin.x.is_finite());
+    assert!(before_rtl.rect().size.height > 0.0);
+    assert!(after_rtl.rect().size.height > 0.0);
+    assert!(before_rtl.rect().origin.x.is_finite());
+    assert!(after_rtl.rect().origin.x.is_finite());
 }
 
 #[test]
@@ -711,12 +744,12 @@ fn selection_geometry_for_bidi_range() {
     );
     let geometry = layout.selection(selection);
 
-    assert!(!geometry.rects.is_empty());
+    assert!(!geometry.rects().is_empty());
     assert!(
         geometry
-            .rects
+            .rects()
             .iter()
-            .all(|rect| rect.rect.origin.x.is_finite() && rect.rect.size.width.is_finite())
+            .all(|rect| rect.rect().origin.x.is_finite() && rect.rect().size.width.is_finite())
     );
 }
 
@@ -735,7 +768,7 @@ fn inline_box_participates_in_layout() {
     let boxes = layout.inline_boxes();
 
     assert_eq!(boxes.len(), 1);
-    assert_eq!(boxes[0].id, Id::from_u64(7));
+    assert_eq!(boxes[0].id(), Id::from_u64(7));
 }
 
 #[test]
@@ -757,12 +790,12 @@ fn out_of_flow_inline_box_preserves_metrics_and_reports_anchor() {
     let layout = builder.build().expect("layout should build");
     let boxes = layout.inline_boxes();
 
-    assert_eq!(layout.metrics().size, plain_metrics.size);
+    assert_eq!(layout.metrics().size(), plain_metrics.size());
     assert_eq!(boxes.len(), 1);
-    assert_eq!(boxes[0].id, Id::from_u64(8));
-    assert_eq!(boxes[0].kind, InlineBoxKind::OutOfFlow);
-    assert_eq!(boxes[0].index, 5);
-    assert_eq!(boxes[0].rect.size, Size::new(20.0, 10.0));
+    assert_eq!(boxes[0].id(), Id::from_u64(8));
+    assert_eq!(boxes[0].kind(), InlineBoxKind::OutOfFlow);
+    assert_eq!(boxes[0].index(), 5);
+    assert_eq!(boxes[0].rect().size, Size::new(20.0, 10.0));
 }
 
 #[test]
@@ -776,7 +809,7 @@ fn hit_detects_inline_box() {
         Size::new(20.0, 10.0),
     ));
     let layout = builder.build().expect("layout should build");
-    let box_rect = layout.inline_boxes()[0].rect;
+    let box_rect = layout.inline_boxes()[0].rect();
 
     assert_eq!(layout.hit(box_rect.origin), Hit::InlineBox(Id::from_u64(7)));
 }
@@ -800,7 +833,7 @@ fn movement_handles_clusters() {
 
     let moved = layout.move_cursor(Cursor::new(0, Affinity::After), Movement::NextCluster);
 
-    assert!(moved.index > 0);
+    assert!(moved.index() > 0);
 }
 
 #[test]
@@ -808,10 +841,10 @@ fn glyphs_report_cluster_source_ranges() {
     let mut system = System::default();
     let mut builder = system.builder("ab");
     let layout = builder.build().expect("layout should build");
-    let ranges = layout
-        .glyph_runs()
-        .into_iter()
-        .flat_map(|run| run.glyphs.into_iter().map(|glyph| glyph.range))
+    let runs = layout.glyph_runs();
+    let ranges = runs
+        .iter()
+        .flat_map(|run| run.glyphs().iter().map(|glyph| glyph.range()))
         .collect::<Vec<_>>();
 
     assert!(ranges.contains(&Range::new(0, 1)));
@@ -829,22 +862,22 @@ fn clusters_report_source_ranges_and_bounds() {
     assert!(
         clusters
             .iter()
-            .any(|cluster| cluster.range == Range::new(0, 1))
+            .any(|cluster| cluster.range() == Range::new(0, 1))
     );
     assert!(
         clusters
             .iter()
-            .any(|cluster| cluster.range == Range::new(1, 2))
+            .any(|cluster| cluster.range() == Range::new(1, 2))
     );
     assert!(
         clusters
             .iter()
-            .all(|cluster| cluster.bounds.size.width >= 0.0)
+            .all(|cluster| cluster.bounds().size.width >= 0.0)
     );
     assert!(
         clusters
             .iter()
-            .all(|cluster| cluster.bounds.size.height >= 0.0)
+            .all(|cluster| cluster.bounds().size.height >= 0.0)
     );
 }
 
@@ -881,8 +914,8 @@ fn movement_handles_previous_and_next_line() {
     let previous = layout.move_cursor(Cursor::new(8, Affinity::After), Movement::PreviousLine);
     let next = layout.move_cursor(Cursor::new(8, Affinity::After), Movement::NextLine);
 
-    assert!(previous.index < 6);
-    assert!(next.index > 10);
+    assert!(previous.index() < 6);
+    assert!(next.index() > 10);
 }
 
 #[test]
@@ -894,8 +927,8 @@ fn movement_can_extend_selection() {
 
     let extended = layout.move_selection(selection, Movement::NextCluster, true);
 
-    assert_eq!(extended.anchor, Cursor::new(0, Affinity::After));
-    assert!(extended.focus.index > extended.anchor.index);
+    assert_eq!(extended.anchor(), Cursor::new(0, Affinity::After));
+    assert!(extended.focus().index() > extended.anchor().index());
     assert!(!extended.is_collapsed());
 }
 
@@ -912,7 +945,7 @@ fn movement_without_extend_collapses_selection() {
     let moved = layout.move_selection(selection, Movement::PreviousCluster, false);
 
     assert!(moved.is_collapsed());
-    assert!(moved.focus.index < 5);
+    assert!(moved.focus().index() < 5);
 }
 
 #[test]
@@ -1026,16 +1059,16 @@ fn edits_project_ranges_and_revision() {
 
     assert_eq!(replaced.text(), "aXXYYdef");
     assert_eq!(replaced.revision(), 5);
-    assert_eq!(replaced.spans()[0].range, Range::new(1, 7));
-    assert_eq!(replaced.boxes()[0].index, 7);
+    assert_eq!(replaced.spans()[0].range(), Range::new(1, 7));
+    assert_eq!(replaced.boxes()[0].index(), 7);
     assert_eq!(deleted.text(), "aef");
     assert_eq!(deleted.revision(), 5);
-    assert_eq!(deleted.spans()[0].range, Range::new(1, 2));
-    assert_eq!(deleted.boxes()[0].index, 2);
+    assert_eq!(deleted.spans()[0].range(), Range::new(1, 2));
+    assert_eq!(deleted.boxes()[0].index(), 2);
     assert_eq!(inserted.text(), "abcZZdef");
     assert_eq!(inserted.revision(), 5);
-    assert_eq!(inserted.spans()[0].range, Range::new(2, 7));
-    assert_eq!(inserted.boxes()[0].index, 7);
+    assert_eq!(inserted.spans()[0].range(), Range::new(2, 7));
+    assert_eq!(inserted.boxes()[0].index(), 7);
 }
 
 #[test]
@@ -1075,7 +1108,7 @@ fn glyph_runs_preserve_resolved_brush() {
         layout
             .glyph_runs()
             .iter()
-            .any(|run| run.brush == brush && run.style == style)
+            .any(|run| run.brush() == brush && run.style() == &style)
     );
 }
 
@@ -1087,7 +1120,7 @@ fn glyph_runs_expose_resolved_font_data() {
     let runs = layout.glyph_runs();
     let data = runs
         .iter()
-        .find_map(|run| run.font.data())
+        .find_map(|run| run.font().data())
         .expect("glyph runs should expose resolved font data");
 
     assert!(!data.bytes().is_empty());
@@ -1273,7 +1306,7 @@ fn composed_source_builds_through_layout_system() {
         .layout(source, Style::default(), Options::default())
         .expect("composed source should build");
 
-    assert_eq!(layout.metrics().line_count, 1);
+    assert_eq!(layout.metrics().line_count(), 1);
 }
 
 #[cfg(feature = "text-render")]

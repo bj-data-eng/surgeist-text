@@ -33,20 +33,18 @@ impl Layout {
 
     #[must_use]
     pub fn metrics(&self) -> Metrics {
-        Metrics {
-            size: Size::new(self.inner.width(), self.inner.height()),
-            full_width: self.inner.full_width(),
-            line_count: self.inner.len(),
-            first_baseline: self.inner.get(0).map(|line| line.metrics().baseline),
-            last_baseline: self
-                .inner
+        Metrics::new(
+            Size::new(self.inner.width(), self.inner.height()),
+            self.inner.full_width(),
+            self.inner.len(),
+            self.inner.get(0).map(|line| line.metrics().baseline),
+            self.inner
                 .get(self.inner.len().saturating_sub(1))
                 .map(|line| line.metrics().baseline),
-            overflow: self
-                .key
+            self.key
                 .options_width
                 .is_some_and(|width| self.inner.full_width() > width.0),
-        }
+        )
     }
 
     #[must_use]
@@ -69,17 +67,17 @@ impl Layout {
             .enumerate()
             .map(|(index, line)| {
                 let metrics = line.metrics();
-                Line {
+                Line::new(
                     index,
-                    range: Range::new(line.text_range().start, line.text_range().end),
-                    baseline: metrics.baseline,
-                    bounds: Rect::new(
+                    Range::new(line.text_range().start, line.text_range().end),
+                    metrics.baseline,
+                    Rect::new(
                         metrics.inline_min_coord,
                         metrics.block_min_coord,
                         metrics.inline_max_coord - metrics.inline_min_coord,
                         metrics.block_max_coord - metrics.block_min_coord,
                     ),
-                }
+                )
             })
             .collect()
     }
@@ -100,25 +98,29 @@ impl Layout {
                     });
                     let glyphs: Vec<Glyph> = run
                         .positioned_glyphs()
-                        .map(|glyph| Glyph {
-                            id: glyph.id,
-                            x: glyph.x,
-                            y: glyph.y,
-                            advance: glyph.advance,
-                            range: ranges.next().unwrap_or(fallback_range),
+                        .map(|glyph| {
+                            Glyph::new(
+                                glyph.id,
+                                glyph.x,
+                                glyph.y,
+                                glyph.advance,
+                                ranges.next().unwrap_or(fallback_range),
+                            )
                         })
                         .collect();
                     let style = self.style_for_run(fallback_range, &glyphs, brush);
-                    Some(Run {
-                        font: FontRef::from_parley(run.run().font()),
+                    Some(Run::new(
+                        FontRef::from_parley(run.run().font()),
                         style,
-                        font_size: run.run().font_size(),
                         brush,
-                        baseline: run.baseline(),
-                        offset: run.offset(),
-                        advance: run.advance(),
+                        RunMetrics::new(
+                            run.run().font_size(),
+                            run.baseline(),
+                            run.offset(),
+                            run.advance(),
+                        ),
                         glyphs,
-                    })
+                    ))
                 }
                 PositionedLayoutItem::InlineBox(_) => None,
             })
@@ -162,21 +164,20 @@ impl Layout {
             .lines()
             .flat_map(|line| line.items())
             .filter_map(|item| match item {
-                PositionedLayoutItem::InlineBox(box_) => Some(PositionedInlineBox {
-                    id: Id::from_u64(box_.id),
-                    kind: match box_.kind {
+                PositionedLayoutItem::InlineBox(box_) => Some(PositionedInlineBox::new(
+                    Id::from_u64(box_.id),
+                    match box_.kind {
                         parley::InlineBoxKind::InFlow => InlineBoxKind::InFlow,
                         parley::InlineBoxKind::OutOfFlow
                         | parley::InlineBoxKind::CustomOutOfFlow => InlineBoxKind::OutOfFlow,
                     },
-                    rect: Rect::new(box_.x, box_.y, box_.width, box_.height),
-                    index: self
-                        .source
+                    Rect::new(box_.x, box_.y, box_.width, box_.height),
+                    self.source
                         .boxes
                         .iter()
                         .find(|source_box| source_box.id.as_u64() == box_.id)
                         .map_or(0, |source_box| source_box.index),
-                }),
+                )),
                 PositionedLayoutItem::GlyphRun(_) => None,
             })
             .collect()
@@ -190,15 +191,15 @@ impl Layout {
                 for cluster in run.clusters() {
                     let range = cluster.text_range();
                     let x = cluster.visual_offset().unwrap_or(line_metrics.offset);
-                    clusters.push(Cluster {
-                        range: Range::new(range.start, range.end),
-                        bounds: Rect::new(
+                    clusters.push(Cluster::new(
+                        Range::new(range.start, range.end),
+                        Rect::new(
                             x,
                             line_metrics.block_min_coord,
                             cluster.advance(),
                             line_metrics.block_max_coord - line_metrics.block_min_coord,
                         ),
-                    });
+                    ));
                 }
             }
         }
@@ -216,8 +217,8 @@ impl Layout {
                 let x = run.offset();
                 let width = run.advance();
                 if let Some(decoration) = &style.underline {
-                    decorations.push(DecorationRun {
-                        rect: Rect::new(
+                    decorations.push(DecorationRun::new(
+                        Rect::new(
                             x,
                             decoration_top(
                                 run.baseline(),
@@ -230,13 +231,13 @@ impl Layout {
                                 .size
                                 .unwrap_or_else(|| run.run().metrics().underline_size),
                         ),
-                        brush: decoration.brush,
-                        kind: DecorationKind::Underline,
-                    });
+                        decoration.brush,
+                        DecorationKind::Underline,
+                    ));
                 }
                 if let Some(decoration) = &style.strikethrough {
-                    decorations.push(DecorationRun {
-                        rect: Rect::new(
+                    decorations.push(DecorationRun::new(
+                        Rect::new(
                             x,
                             decoration_top(
                                 run.baseline(),
@@ -249,9 +250,9 @@ impl Layout {
                                 .size
                                 .unwrap_or_else(|| run.run().metrics().strikethrough_size),
                         ),
-                        brush: decoration.brush,
-                        kind: DecorationKind::Strikethrough,
-                    });
+                        decoration.brush,
+                        DecorationKind::Strikethrough,
+                    ));
                 }
             }
         }
@@ -282,23 +283,18 @@ impl Layout {
     #[must_use]
     pub fn cursor(&self, cursor: Cursor) -> CursorGeometry {
         let cursor = cursor.to_parley(&self.inner);
-        CursorGeometry {
-            rect: rect_from_bounds(cursor.geometry(&self.inner, 1.0)),
-        }
+        CursorGeometry::new(rect_from_bounds(cursor.geometry(&self.inner, 1.0)))
     }
 
     pub fn selection(&self, selection: Selection) -> SelectionGeometry {
         let selection = selection.to_parley(&self.inner);
-        SelectionGeometry {
-            rects: selection
+        SelectionGeometry::new(
+            selection
                 .geometry(&self.inner)
                 .into_iter()
-                .map(|(bounds, line)| SelectionRect {
-                    rect: rect_from_bounds(bounds),
-                    line,
-                })
+                .map(|(bounds, line)| SelectionRect::new(rect_from_bounds(bounds), line))
                 .collect(),
-        }
+        )
     }
 
     #[must_use]
@@ -347,25 +343,25 @@ impl Layout {
     ) {
         for run in self.glyph_runs() {
             let glyphs: Vec<_> = run
-                .glyphs
+                .glyphs()
                 .iter()
                 .map(|glyph| surgeist_render::TextGlyph {
-                    id: glyph.id,
-                    x: glyph.x,
-                    y: glyph.y,
-                    advance: glyph.advance,
+                    id: glyph.id(),
+                    x: glyph.x(),
+                    y: glyph.y(),
+                    advance: glyph.advance(),
                 })
                 .collect();
-            let mut font = surgeist_render::FontRef::new(run.font.id);
-            if let Some(data) = run.font.data() {
+            let mut font = surgeist_render::FontRef::new(run.font().id());
+            if let Some(data) = run.font().data() {
                 font = font.with_data(data.to_render());
             }
             scene.text_run(surgeist_render::TextRun {
                 font,
-                size: run.font_size,
+                size: run.font_size(),
                 transform,
                 paint: surgeist_render::TextPaint {
-                    fill: render_color(run.brush).into(),
+                    fill: render_color(run.brush()).into(),
                 },
                 glyphs: &glyphs,
             });
@@ -374,7 +370,10 @@ impl Layout {
         if !decorations.is_empty() {
             scene.transform(transform, |scene| {
                 for decoration in decorations {
-                    scene.fill(render_rect(decoration.rect), render_color(decoration.brush));
+                    scene.fill(
+                        render_rect(decoration.rect()),
+                        render_color(decoration.brush()),
+                    );
                 }
             });
         }
@@ -563,37 +562,216 @@ fn render_color(brush: Brush) -> surgeist_render::Color {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Metrics {
-    pub size: Size,
-    pub full_width: f32,
-    pub line_count: usize,
-    pub first_baseline: Option<f32>,
-    pub last_baseline: Option<f32>,
-    pub overflow: bool,
+    size: Size,
+    full_width: f32,
+    line_count: usize,
+    first_baseline: Option<f32>,
+    last_baseline: Option<f32>,
+    overflow: bool,
+}
+
+impl Metrics {
+    #[must_use]
+    pub const fn new(
+        size: Size,
+        full_width: f32,
+        line_count: usize,
+        first_baseline: Option<f32>,
+        last_baseline: Option<f32>,
+        overflow: bool,
+    ) -> Self {
+        Self {
+            size,
+            full_width,
+            line_count,
+            first_baseline,
+            last_baseline,
+            overflow,
+        }
+    }
+
+    #[must_use]
+    pub const fn size(self) -> Size {
+        self.size
+    }
+
+    #[must_use]
+    pub const fn full_width(self) -> f32 {
+        self.full_width
+    }
+
+    #[must_use]
+    pub const fn line_count(self) -> usize {
+        self.line_count
+    }
+
+    #[must_use]
+    pub const fn first_baseline(self) -> Option<f32> {
+        self.first_baseline
+    }
+
+    #[must_use]
+    pub const fn last_baseline(self) -> Option<f32> {
+        self.last_baseline
+    }
+
+    #[must_use]
+    pub const fn overflow(self) -> bool {
+        self.overflow
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Line {
-    pub index: usize,
-    pub range: Range,
-    pub baseline: f32,
-    pub bounds: Rect,
+    index: usize,
+    range: Range,
+    baseline: f32,
+    bounds: Rect,
+}
+
+impl Line {
+    #[must_use]
+    pub const fn new(index: usize, range: Range, baseline: f32, bounds: Rect) -> Self {
+        Self {
+            index,
+            range,
+            baseline,
+            bounds,
+        }
+    }
+
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self.index
+    }
+
+    #[must_use]
+    pub const fn range(self) -> Range {
+        self.range
+    }
+
+    #[must_use]
+    pub const fn baseline(self) -> f32 {
+        self.baseline
+    }
+
+    #[must_use]
+    pub const fn bounds(self) -> Rect {
+        self.bounds
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Run {
-    pub font: FontRef,
-    pub style: Style,
-    pub font_size: f32,
-    pub brush: Brush,
-    pub baseline: f32,
-    pub offset: f32,
-    pub advance: f32,
-    pub glyphs: Vec<Glyph>,
+    font: FontRef,
+    style: Style,
+    brush: Brush,
+    metrics: RunMetrics,
+    glyphs: Vec<Glyph>,
+}
+
+impl Run {
+    #[must_use]
+    pub fn new(
+        font: FontRef,
+        style: Style,
+        brush: Brush,
+        metrics: RunMetrics,
+        glyphs: Vec<Glyph>,
+    ) -> Self {
+        Self {
+            font,
+            style,
+            brush,
+            metrics,
+            glyphs,
+        }
+    }
+
+    #[must_use]
+    pub fn font(&self) -> &FontRef {
+        &self.font
+    }
+
+    #[must_use]
+    pub const fn style(&self) -> &Style {
+        &self.style
+    }
+
+    #[must_use]
+    pub const fn font_size(&self) -> f32 {
+        self.metrics.font_size()
+    }
+
+    #[must_use]
+    pub const fn brush(&self) -> Brush {
+        self.brush
+    }
+
+    #[must_use]
+    pub const fn baseline(&self) -> f32 {
+        self.metrics.baseline()
+    }
+
+    #[must_use]
+    pub const fn offset(&self) -> f32 {
+        self.metrics.offset()
+    }
+
+    #[must_use]
+    pub const fn advance(&self) -> f32 {
+        self.metrics.advance()
+    }
+
+    #[must_use]
+    pub fn glyphs(&self) -> &[Glyph] {
+        &self.glyphs
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RunMetrics {
+    font_size: f32,
+    baseline: f32,
+    offset: f32,
+    advance: f32,
+}
+
+impl RunMetrics {
+    #[must_use]
+    pub const fn new(font_size: f32, baseline: f32, offset: f32, advance: f32) -> Self {
+        Self {
+            font_size,
+            baseline,
+            offset,
+            advance,
+        }
+    }
+
+    #[must_use]
+    pub const fn font_size(self) -> f32 {
+        self.font_size
+    }
+
+    #[must_use]
+    pub const fn baseline(self) -> f32 {
+        self.baseline
+    }
+
+    #[must_use]
+    pub const fn offset(self) -> f32 {
+        self.offset
+    }
+
+    #[must_use]
+    pub const fn advance(self) -> f32 {
+        self.advance
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FontRef {
-    pub id: u64,
+    id: u64,
     data: Option<FontData>,
 }
 
@@ -601,6 +779,11 @@ impl FontRef {
     #[must_use]
     pub const fn new(id: u64) -> Self {
         Self { id, data: None }
+    }
+
+    #[must_use]
+    pub const fn id(&self) -> u64 {
+        self.id
     }
 
     #[must_use]
@@ -650,25 +833,112 @@ impl FontData {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Glyph {
-    pub id: u32,
-    pub x: f32,
-    pub y: f32,
-    pub advance: f32,
-    pub range: Range,
+    id: u32,
+    x: f32,
+    y: f32,
+    advance: f32,
+    range: Range,
+}
+
+impl Glyph {
+    #[must_use]
+    pub const fn new(id: u32, x: f32, y: f32, advance: f32, range: Range) -> Self {
+        Self {
+            id,
+            x,
+            y,
+            advance,
+            range,
+        }
+    }
+
+    #[must_use]
+    pub const fn id(self) -> u32 {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn x(self) -> f32 {
+        self.x
+    }
+
+    #[must_use]
+    pub const fn y(self) -> f32 {
+        self.y
+    }
+
+    #[must_use]
+    pub const fn advance(self) -> f32 {
+        self.advance
+    }
+
+    #[must_use]
+    pub const fn range(self) -> Range {
+        self.range
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Cluster {
-    pub range: Range,
-    pub bounds: Rect,
+    range: Range,
+    bounds: Rect,
+}
+
+impl Cluster {
+    #[must_use]
+    pub const fn new(range: Range, bounds: Rect) -> Self {
+        Self { range, bounds }
+    }
+
+    #[must_use]
+    pub const fn range(self) -> Range {
+        self.range
+    }
+
+    #[must_use]
+    pub const fn bounds(self) -> Rect {
+        self.bounds
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PositionedInlineBox {
-    pub id: Id,
-    pub kind: InlineBoxKind,
-    pub rect: Rect,
-    pub index: usize,
+    id: Id,
+    kind: InlineBoxKind,
+    rect: Rect,
+    index: usize,
+}
+
+impl PositionedInlineBox {
+    #[must_use]
+    pub const fn new(id: Id, kind: InlineBoxKind, rect: Rect, index: usize) -> Self {
+        Self {
+            id,
+            kind,
+            rect,
+            index,
+        }
+    }
+
+    #[must_use]
+    pub const fn id(self) -> Id {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> InlineBoxKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn rect(self) -> Rect {
+        self.rect
+    }
+
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self.index
+    }
 }
 
 #[cfg(feature = "text-accessibility")]
@@ -705,9 +975,31 @@ pub enum Hit {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DecorationRun {
-    pub rect: Rect,
-    pub brush: Brush,
-    pub kind: DecorationKind,
+    rect: Rect,
+    brush: Brush,
+    kind: DecorationKind,
+}
+
+impl DecorationRun {
+    #[must_use]
+    pub const fn new(rect: Rect, brush: Brush, kind: DecorationKind) -> Self {
+        Self { rect, brush, kind }
+    }
+
+    #[must_use]
+    pub const fn rect(self) -> Rect {
+        self.rect
+    }
+
+    #[must_use]
+    pub const fn brush(self) -> Brush {
+        self.brush
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> DecorationKind {
+        self.kind
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -718,14 +1010,24 @@ pub enum DecorationKind {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Cursor {
-    pub index: usize,
-    pub affinity: Affinity,
+    index: usize,
+    affinity: Affinity,
 }
 
 impl Cursor {
     #[must_use]
     pub const fn new(index: usize, affinity: Affinity) -> Self {
         Self { index, affinity }
+    }
+
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self.index
+    }
+
+    #[must_use]
+    pub const fn affinity(self) -> Affinity {
+        self.affinity
     }
 
     fn from_parley(cursor: parley::Cursor) -> Self {
@@ -766,13 +1068,25 @@ impl From<Affinity> for parley::Affinity {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CursorGeometry {
-    pub rect: Rect,
+    rect: Rect,
+}
+
+impl CursorGeometry {
+    #[must_use]
+    pub const fn new(rect: Rect) -> Self {
+        Self { rect }
+    }
+
+    #[must_use]
+    pub const fn rect(self) -> Rect {
+        self.rect
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Selection {
-    pub anchor: Cursor,
-    pub focus: Cursor,
+    anchor: Cursor,
+    focus: Cursor,
 }
 
 impl Selection {
@@ -787,6 +1101,16 @@ impl Selection {
             anchor: cursor,
             focus: cursor,
         }
+    }
+
+    #[must_use]
+    pub const fn anchor(self) -> Cursor {
+        self.anchor
+    }
+
+    #[must_use]
+    pub const fn focus(self) -> Cursor {
+        self.focus
     }
 
     #[must_use]
@@ -810,13 +1134,42 @@ impl Selection {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SelectionGeometry {
-    pub rects: Vec<SelectionRect>,
+    rects: Vec<SelectionRect>,
+}
+
+impl SelectionGeometry {
+    #[must_use]
+    pub fn new(rects: Vec<SelectionRect>) -> Self {
+        Self { rects }
+    }
+
+    #[must_use]
+    pub fn rects(&self) -> &[SelectionRect] {
+        &self.rects
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SelectionRect {
-    pub rect: Rect,
-    pub line: usize,
+    rect: Rect,
+    line: usize,
+}
+
+impl SelectionRect {
+    #[must_use]
+    pub const fn new(rect: Rect, line: usize) -> Self {
+        Self { rect, line }
+    }
+
+    #[must_use]
+    pub const fn rect(self) -> Rect {
+        self.rect
+    }
+
+    #[must_use]
+    pub const fn line(self) -> usize {
+        self.line
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

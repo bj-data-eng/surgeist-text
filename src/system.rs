@@ -51,9 +51,9 @@ impl System {
 
     pub fn refresh_fonts(&mut self) -> Result<()> {
         self.font_generation = self.font_generation.next();
-        self.stats.invalidations = self.stats.invalidations.saturating_add(self.cache.len());
+        self.stats.record_invalidations(self.cache.len());
         self.cache.clear();
-        self.stats.font_refreshes = self.stats.font_refreshes.saturating_add(1);
+        self.stats.record_font_refresh();
         Ok(())
     }
 
@@ -123,7 +123,7 @@ impl Builder<'_> {
             self.system.font_generation,
         );
         if let Some(layout) = self.system.cache.get(&key) {
-            self.system.stats.layout_hits = self.system.stats.layout_hits.saturating_add(1);
+            self.system.stats.record_layout_hit();
             return Ok(layout.clone());
         }
 
@@ -159,7 +159,7 @@ impl Builder<'_> {
             AlignmentOptions::default(),
         );
 
-        self.system.stats.layout_misses = self.system.stats.layout_misses.saturating_add(1);
+        self.system.stats.record_layout_miss();
 
         let layout = Layout {
             inner: layout,

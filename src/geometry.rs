@@ -10,6 +10,16 @@ impl Point {
     pub const fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
+
+    #[must_use]
+    pub const fn x(self) -> f32 {
+        self.x
+    }
+
+    #[must_use]
+    pub const fn y(self) -> f32 {
+        self.y
+    }
 }
 
 /// Logical size in text layout coordinates.
@@ -23,6 +33,16 @@ impl Size {
     #[must_use]
     pub const fn new(width: f32, height: f32) -> Self {
         Self { width, height }
+    }
+
+    #[must_use]
+    pub const fn width(self) -> f32 {
+        self.width
+    }
+
+    #[must_use]
+    pub const fn height(self) -> f32 {
+        self.height
     }
 }
 
@@ -40,6 +60,16 @@ impl Rect {
             origin: Point::new(x, y),
             size: Size::new(width, height),
         }
+    }
+
+    #[must_use]
+    pub const fn origin(self) -> Point {
+        self.origin
+    }
+
+    #[must_use]
+    pub const fn size(self) -> Size {
+        self.size
     }
 
     #[must_use]
