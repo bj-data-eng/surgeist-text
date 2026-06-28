@@ -507,6 +507,48 @@ fn validated_source_snapshot_rejects_invalid_boxes_before_cache_keying() {
 }
 
 #[test]
+fn validated_source_snapshot_rejects_invalid_inline_box_size_before_cache_keying() {
+    let mut source = Source::new("hello");
+    source.inline_box(InlineBox::new(
+        Id::from_u64(12),
+        InlineBoxKind::InFlow,
+        2,
+        Size::new(-1.0, 1.0),
+    ));
+
+    let error = ValidatedSource::try_from(source).expect_err("invalid box size should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+    assert_eq!(
+        error.detail(),
+        Some(&ErrorDetail::InvalidNumericField {
+            field: "inline box width",
+            value: -1.0,
+            requirement: NumericRequirement::FiniteNonNegative,
+        })
+    );
+}
+
+#[test]
+fn system_build_rejects_invalid_inline_box_size_before_projection() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello");
+    builder.inline_box(InlineBox::new(
+        Id::from_u64(13),
+        InlineBoxKind::InFlow,
+        2,
+        Size::new(1.0, f32::NAN),
+    ));
+
+    let error = builder
+        .build()
+        .expect_err("invalid box size should fail before layout");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+    assert!(error.message.contains("inline box height"));
+}
+
+#[test]
 fn validated_source_snapshot_rejects_invalid_span_styles_before_cache_keying() {
     let mut source = Source::new("hello");
     source.span(

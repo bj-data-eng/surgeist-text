@@ -1,4 +1,7 @@
-use super::{Id, Range, Result, Size, SourcePosition, SourceRange, Style, ValidatedStyle, range};
+use super::{
+    Error, ErrorCode, ErrorDetail, Id, NumericRequirement, Range, Result, Size, SourcePosition,
+    SourceRange, Style, ValidatedStyle, range,
+};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SourceRevision(u64);
@@ -107,8 +110,30 @@ fn validate_source(source: &Source) -> Result<Vec<ValidatedSpan>> {
     }
     for box_ in &source.boxes {
         range::validate_index(source.text(), box_.index, "inline box index")?;
+        validate_inline_box_size(box_.size)?;
     }
     Ok(span_styles)
+}
+
+fn validate_inline_box_size(size: Size) -> Result<()> {
+    validate_inline_box_dimension(size.width, "inline box width")?;
+    validate_inline_box_dimension(size.height, "inline box height")?;
+    Ok(())
+}
+
+fn validate_inline_box_dimension(value: f32, field: &'static str) -> Result<()> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(Error::new(
+            ErrorCode::InvalidStyle,
+            format!("{field} must be finite and non-negative"),
+        )
+        .with_detail(ErrorDetail::InvalidNumericField {
+            field,
+            value,
+            requirement: NumericRequirement::FiniteNonNegative,
+        }));
+    }
+    Ok(())
 }
 
 /// Text source plus resolved style spans and inline boxes.
