@@ -345,26 +345,26 @@ impl Layout {
             let glyphs: Vec<_> = run
                 .glyphs()
                 .iter()
-                .map(|glyph| surgeist_render::TextGlyph {
-                    id: glyph.id(),
-                    x: glyph.x(),
-                    y: glyph.y(),
-                    advance: glyph.advance(),
+                .map(|glyph| {
+                    surgeist_render::TextGlyph::try_new(
+                        glyph.id(),
+                        glyph.x(),
+                        glyph.y(),
+                        glyph.advance(),
+                    )
+                    .expect("layout glyph positions and advances are finite")
                 })
                 .collect();
             let mut font = surgeist_render::FontRef::new(run.font().id());
             if let Some(data) = run.font().data() {
                 font = font.with_data(data.to_render());
             }
-            scene.text_run(surgeist_render::TextRun {
-                font,
-                size: run.font_size(),
-                transform,
-                paint: surgeist_render::TextPaint {
-                    fill: render_color(run.brush()).into(),
-                },
-                glyphs: &glyphs,
-            });
+            let paint = surgeist_render::TextPaint::try_fill(render_color(run.brush()).into())
+                .expect("validated text brushes produce valid render paint");
+            let text_run =
+                surgeist_render::TextRun::try_new(font, run.font_size(), transform, paint, &glyphs)
+                    .expect("layout text runs use validated finite metrics");
+            scene.text_run(text_run);
         }
         let decorations = self.decorations();
         if !decorations.is_empty() {
@@ -547,17 +547,19 @@ pub(crate) fn decoration_top(baseline: f32, offset_from_baseline: f32) -> f32 {
 
 #[cfg(feature = "text-render")]
 fn render_rect(rect: Rect) -> surgeist_render::Rect {
-    surgeist_render::Rect::new(
+    surgeist_render::Rect::try_new(
         f64::from(rect.origin.x),
         f64::from(rect.origin.y),
         f64::from(rect.size.width),
         f64::from(rect.size.height),
     )
+    .expect("text render rectangles are valid by construction")
 }
 
 #[cfg(feature = "text-render")]
 fn render_color(brush: Brush) -> surgeist_render::Color {
-    surgeist_render::Color::rgba(brush.r, brush.g, brush.b, brush.a)
+    surgeist_render::Color::try_rgba(brush.r, brush.g, brush.b, brush.a)
+        .expect("validated text brushes use finite unit-interval channels")
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -1379,7 +1379,11 @@ fn render_projection_draws_prepared_glyph_runs() {
     ))
     .expect("renderer should initialize");
     let mut surface = renderer
-        .create_headless(surgeist_render::Size::new(64.0, 32.0), 1.0)
+        .create_headless(
+            surgeist_render::Size::try_new(64.0, 32.0)
+                .expect("headless test surface size is valid"),
+            1.0,
+        )
         .expect("headless surface should initialize");
     let stats = renderer
         .render(&mut surface, &scene, surgeist_render::Parameters::default())
