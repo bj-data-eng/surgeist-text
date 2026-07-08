@@ -240,6 +240,8 @@ fn stable_hash_options(options: Options) -> u64 {
     hash_option_f32(options.width, &mut hasher);
     hash_f32(options.scale, &mut hasher);
     options.alignment.hash(&mut hasher);
+    options.text_overflow.hash(&mut hasher);
+    options.text_align_last.hash(&mut hasher);
     hash_indent(options.indent, &mut hasher);
     options.quantize.hash(&mut hasher);
     hasher.finish()
@@ -267,6 +269,7 @@ fn hash_style<H: Hasher>(style: &Style, hasher: &mut H) {
     style.word_break.hash(hasher);
     style.wrap.hash(hasher);
     style.overflow_wrap.hash(hasher);
+    style.text_transform.hash(hasher);
 }
 
 fn hash_font<H: Hasher>(font: &Font, hasher: &mut H) {

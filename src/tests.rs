@@ -462,6 +462,56 @@ fn text_style_support_matrix_reports_current_support() {
 }
 
 #[test]
+fn default_flow_policy_values_are_explicit_noops() {
+    assert_eq!(Style::default().text_transform, TextTransform::None);
+    assert_eq!(Options::default().text_overflow, TextOverflow::Clip);
+    assert_eq!(Options::default().text_align_last, TextAlignLast::Auto);
+
+    let mut system = System::default();
+    let style = Style {
+        text_transform: TextTransform::None,
+        ..Style::default()
+    };
+    let options = Options {
+        text_overflow: TextOverflow::Clip,
+        text_align_last: TextAlignLast::Auto,
+        ..Options::default()
+    };
+    let mut builder = system.builder("Flow 123");
+    builder.default_style(style);
+    builder.options(options);
+
+    let layout = builder.build().expect("default flow policies should build");
+
+    assert_eq!(layout.source().text(), "Flow 123");
+}
+
+#[test]
+fn default_flow_policy_values_preserve_cache_identity() {
+    let mut system = System::default();
+    let first = system
+        .builder("flow")
+        .build()
+        .expect("default flow policy should build");
+
+    let mut second = system.builder("flow");
+    second.default_style(Style {
+        text_transform: TextTransform::None,
+        ..Style::default()
+    });
+    second.options(Options {
+        text_overflow: TextOverflow::Clip,
+        text_align_last: TextAlignLast::Auto,
+        ..Options::default()
+    });
+    let second = second
+        .build()
+        .expect("explicit default flow policy should build");
+
+    assert_eq!(first.key(), second.key());
+}
+
+#[test]
 fn unsupported_text_style_errors_are_typed() {
     let style = Style {
         direction: Direction::LeftToRight,

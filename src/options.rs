@@ -9,6 +9,8 @@ pub struct Options {
     pub width: Option<f32>,
     pub scale: f32,
     pub alignment: Alignment,
+    pub text_overflow: TextOverflow,
+    pub text_align_last: TextAlignLast,
     pub indent: Indent,
     pub quantize: bool,
 }
@@ -19,6 +21,8 @@ impl Default for Options {
             width: None,
             scale: 1.0,
             alignment: Alignment::Start,
+            text_overflow: TextOverflow::Clip,
+            text_align_last: TextAlignLast::Auto,
             indent: Indent::default(),
             quantize: true,
         }
@@ -46,6 +50,16 @@ impl From<Alignment> for parley::Alignment {
             Alignment::Justify => Self::Justify,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum TextOverflow {
+    Clip,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum TextAlignLast {
+    Auto,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -90,6 +104,16 @@ impl ValidatedOptions {
     #[must_use]
     pub const fn indent(self) -> Indent {
         self.authored.indent
+    }
+
+    #[must_use]
+    pub const fn text_overflow(self) -> TextOverflow {
+        self.authored.text_overflow
+    }
+
+    #[must_use]
+    pub const fn text_align_last(self) -> TextAlignLast {
+        self.authored.text_align_last
     }
 
     pub(crate) fn parley_indent(self) -> Option<(f32, parley::IndentOptions)> {

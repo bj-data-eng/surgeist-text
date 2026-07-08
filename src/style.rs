@@ -233,6 +233,7 @@ pub struct Style {
     pub word_break: WordBreak,
     pub wrap: Wrap,
     pub overflow_wrap: OverflowWrap,
+    pub text_transform: TextTransform,
 }
 
 impl Style {
@@ -259,6 +260,7 @@ impl Default for Style {
             word_break: WordBreak::Normal,
             wrap: Wrap::Word,
             overflow_wrap: OverflowWrap::Normal,
+            text_transform: TextTransform::None,
         }
     }
 }
@@ -333,6 +335,11 @@ impl From<OverflowWrap> for parley::OverflowWrap {
             OverflowWrap::BreakWord => Self::BreakWord,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum TextTransform {
+    None,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -429,6 +436,11 @@ impl ValidatedStyle {
     #[must_use]
     pub fn font_variations(&self) -> &[String] {
         &self.authored.font.variations
+    }
+
+    #[must_use]
+    pub fn text_transform(&self) -> TextTransform {
+        self.authored.text_transform
     }
 
     pub(crate) const fn parley_locale(&self) -> Option<parley::Language> {

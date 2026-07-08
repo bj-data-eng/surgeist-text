@@ -33,14 +33,15 @@ pub use layout::{
     Glyph, Hit, Layout, Line, Metrics, Movement, PositionedInlineBox, Run, RunMetrics, Selection,
     SelectionGeometry, SelectionRect,
 };
-pub use options::{Alignment, Indent, Options, ValidatedOptions};
+pub use options::{Alignment, Indent, Options, TextAlignLast, TextOverflow, ValidatedOptions};
 pub use range::{Range, SourcePosition, SourceRange};
 pub use source_model::{
     InlineBox, InlineBoxKind, Source, SourceIdentity, SourceRevision, Span, ValidatedSource,
 };
 pub use style::{
     Brush, Decoration, Direction, Font, FontVariant, FontWeightValue, FontWidthRatio, LineHeight,
-    OverflowWrap, Slant, Style, ValidatedStyle, Weight, WhiteSpace, Width, WordBreak, Wrap,
+    OverflowWrap, Slant, Style, TextTransform, ValidatedStyle, Weight, WhiteSpace, Width,
+    WordBreak, Wrap,
 };
 pub use style_support::{TextStyleFeature, TextStyleSupport, UnsupportedTextStyleReason};
 pub use system::{Builder, System, SystemOptions};
