@@ -352,10 +352,10 @@ pub enum Direction {
 /// Solid text decoration.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Decoration {
-    pub enabled: bool,
-    pub offset: Option<f32>,
-    pub size: Option<f32>,
-    pub brush: Option<Brush>,
+    enabled: bool,
+    offset: DecorationOffset,
+    thickness: DecorationThickness,
+    brush: DecorationBrush,
 }
 
 impl Decoration {
@@ -363,26 +363,142 @@ impl Decoration {
     pub const fn none() -> Self {
         Self {
             enabled: false,
-            offset: None,
-            size: None,
-            brush: None,
+            offset: DecorationOffset::Auto,
+            thickness: DecorationThickness::Auto,
+            brush: DecorationBrush::TextColor,
         }
     }
 
     #[must_use]
-    pub const fn solid(brush: Option<Brush>) -> Self {
+    pub const fn solid() -> Self {
         Self {
             enabled: true,
-            offset: None,
-            size: None,
-            brush,
+            offset: DecorationOffset::Auto,
+            thickness: DecorationThickness::Auto,
+            brush: DecorationBrush::TextColor,
         }
+    }
+
+    #[must_use]
+    pub const fn with_offset(mut self, offset: DecorationOffset) -> Self {
+        self.offset = offset;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_thickness(mut self, thickness: DecorationThickness) -> Self {
+        self.thickness = thickness;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_brush(mut self, brush: DecorationBrush) -> Self {
+        self.brush = brush;
+        self
+    }
+
+    #[must_use]
+    pub const fn enabled(self) -> bool {
+        self.enabled
+    }
+
+    #[must_use]
+    pub const fn offset(self) -> DecorationOffset {
+        self.offset
+    }
+
+    #[must_use]
+    pub const fn thickness(self) -> DecorationThickness {
+        self.thickness
+    }
+
+    #[must_use]
+    pub const fn brush(self) -> DecorationBrush {
+        self.brush
     }
 }
 
 impl Default for Decoration {
     fn default() -> Self {
         Self::none()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DecorationOffset {
+    Auto,
+    Absolute(DecorationOffsetValue),
+}
+
+impl DecorationOffset {
+    pub fn try_absolute(value: f32) -> Result<Self> {
+        validate_finite_f32(value, "decoration offset")?;
+        Ok(Self::Absolute(DecorationOffsetValue(value)))
+    }
+
+    #[must_use]
+    pub const fn to_parley(self) -> Option<f32> {
+        match self {
+            Self::Auto => None,
+            Self::Absolute(value) => Some(value.get()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DecorationOffsetValue(f32);
+
+impl DecorationOffsetValue {
+    #[must_use]
+    pub const fn get(self) -> f32 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DecorationThickness {
+    Auto,
+    Absolute(DecorationThicknessValue),
+}
+
+impl DecorationThickness {
+    pub fn try_absolute(value: f32) -> Result<Self> {
+        validate_positive_f32(value, "decoration thickness")?;
+        Ok(Self::Absolute(DecorationThicknessValue(value)))
+    }
+
+    #[must_use]
+    pub const fn to_parley(self) -> Option<f32> {
+        match self {
+            Self::Auto => None,
+            Self::Absolute(value) => Some(value.get()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DecorationThicknessValue(f32);
+
+impl DecorationThicknessValue {
+    #[must_use]
+    pub const fn get(self) -> f32 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DecorationBrush {
+    TextColor,
+    Color(Brush),
+}
+
+impl DecorationBrush {
+    #[must_use]
+    pub const fn to_parley(self) -> Option<Brush> {
+        match self {
+            Self::TextColor => None,
+            Self::Color(brush) => Some(brush),
+        }
     }
 }
 
@@ -549,17 +665,12 @@ fn validate_slant(slant: Slant) -> Result<()> {
 }
 
 fn validate_decoration(decoration: Decoration, name: &str) -> Result<()> {
-    if !decoration.enabled {
+    if !decoration.enabled() {
         return Ok(());
     }
-    if let Some(offset) = decoration.offset {
-        validate_finite_f32(offset, &format!("{name} offset"))?;
-    }
-    if let Some(size) = decoration.size {
-        validate_positive_f32(size, &format!("{name} size"))?;
-    }
-    if let Some(brush) = decoration.brush {
-        validate_brush(brush, &format!("{name} brush"))?;
+    match decoration.brush() {
+        DecorationBrush::TextColor => {}
+        DecorationBrush::Color(brush) => validate_brush(brush, &format!("{name} brush"))?,
     }
     Ok(())
 }
@@ -627,6 +738,8 @@ fn numeric_field(name: &str) -> &'static str {
         "letter spacing" => "letter spacing",
         "word spacing" => "word spacing",
         "oblique angle" => "oblique angle",
+        "decoration offset" => "decoration offset",
+        "decoration thickness" => "decoration thickness",
         "underline offset" => "underline offset",
         "underline size" => "underline size",
         "strikethrough offset" => "strikethrough offset",

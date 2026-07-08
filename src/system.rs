@@ -231,18 +231,26 @@ fn push_style_properties(
     push(StyleProperty::WordBreak(authored.word_break.into()));
     push(StyleProperty::OverflowWrap(authored.overflow_wrap.into()));
     push(StyleProperty::TextWrapMode(authored.wrap.into()));
-    push(StyleProperty::Underline(authored.underline.enabled));
-    push(StyleProperty::UnderlineOffset(authored.underline.offset));
-    push(StyleProperty::UnderlineSize(authored.underline.size));
-    push(StyleProperty::UnderlineBrush(authored.underline.brush));
-    push(StyleProperty::Strikethrough(authored.strikethrough.enabled));
+    push(StyleProperty::Underline(authored.underline.enabled()));
+    push(StyleProperty::UnderlineOffset(
+        authored.underline.offset().to_parley(),
+    ));
+    push(StyleProperty::UnderlineSize(
+        authored.underline.thickness().to_parley(),
+    ));
+    push(StyleProperty::UnderlineBrush(
+        authored.underline.brush().to_parley(),
+    ));
+    push(StyleProperty::Strikethrough(
+        authored.strikethrough.enabled(),
+    ));
     push(StyleProperty::StrikethroughOffset(
-        authored.strikethrough.offset,
+        authored.strikethrough.offset().to_parley(),
     ));
     push(StyleProperty::StrikethroughSize(
-        authored.strikethrough.size,
+        authored.strikethrough.thickness().to_parley(),
     ));
     push(StyleProperty::StrikethroughBrush(
-        authored.strikethrough.brush,
+        authored.strikethrough.brush().to_parley(),
     ));
 }

@@ -39,9 +39,10 @@ pub use source_model::{
     InlineBox, InlineBoxKind, Source, SourceIdentity, SourceRevision, Span, ValidatedSource,
 };
 pub use style::{
-    Brush, Decoration, Direction, Font, FontVariant, FontWeightValue, FontWidthRatio, LineHeight,
-    OverflowWrap, Slant, Style, TextTransform, ValidatedStyle, Weight, WhiteSpace, Width,
-    WordBreak, Wrap,
+    Brush, Decoration, DecorationBrush, DecorationOffset, DecorationOffsetValue,
+    DecorationThickness, DecorationThicknessValue, Direction, Font, FontVariant, FontWeightValue,
+    FontWidthRatio, LineHeight, OverflowWrap, Slant, Style, TextTransform, ValidatedStyle, Weight,
+    WhiteSpace, Width, WordBreak, Wrap,
 };
 pub use style_support::{TextStyleFeature, TextStyleSupport, UnsupportedTextStyleReason};
 pub use system::{Builder, System, SystemOptions};

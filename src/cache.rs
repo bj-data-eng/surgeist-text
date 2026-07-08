@@ -2,8 +2,9 @@ use std::hash::{Hash, Hasher};
 
 use super::source_model::ValidatedSpan;
 use super::{
-    Brush, Decoration, Font, Id, Indent, InlineBox, LineHeight, Options, Size, Slant, Source,
-    SourceRevision, Style, ValidatedOptions, ValidatedSource, ValidatedStyle, Weight, Width,
+    Brush, Decoration, DecorationBrush, DecorationOffset, DecorationThickness, Font, Id, Indent,
+    InlineBox, LineHeight, Options, Size, Slant, Source, SourceRevision, Style, ValidatedOptions,
+    ValidatedSource, ValidatedStyle, Weight, Width,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -313,14 +314,30 @@ fn hash_line_height<H: Hasher>(line_height: LineHeight, hasher: &mut H) {
 }
 
 fn hash_decoration<H: Hasher>(decoration: Decoration, hasher: &mut H) {
-    decoration.enabled.hash(hasher);
-    hash_option_f32(decoration.offset, hasher);
-    hash_option_f32(decoration.size, hasher);
-    if let Some(brush) = decoration.brush {
-        true.hash(hasher);
+    decoration.enabled().hash(hasher);
+    hash_decoration_offset(decoration.offset(), hasher);
+    hash_decoration_thickness(decoration.thickness(), hasher);
+    hash_decoration_brush(decoration.brush(), hasher);
+}
+
+fn hash_decoration_offset<H: Hasher>(offset: DecorationOffset, hasher: &mut H) {
+    std::mem::discriminant(&offset).hash(hasher);
+    if let DecorationOffset::Absolute(value) = offset {
+        hash_f32(value.get(), hasher);
+    }
+}
+
+fn hash_decoration_thickness<H: Hasher>(thickness: DecorationThickness, hasher: &mut H) {
+    std::mem::discriminant(&thickness).hash(hasher);
+    if let DecorationThickness::Absolute(value) = thickness {
+        hash_f32(value.get(), hasher);
+    }
+}
+
+fn hash_decoration_brush<H: Hasher>(brush: DecorationBrush, hasher: &mut H) {
+    std::mem::discriminant(&brush).hash(hasher);
+    if let DecorationBrush::Color(brush) = brush {
         hash_brush(brush, hasher);
-    } else {
-        false.hash(hasher);
     }
 }
 

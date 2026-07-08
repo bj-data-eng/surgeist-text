@@ -983,7 +983,7 @@ fn style_span_changes_cache_key() {
     let mut system = System::default();
     let mut first = system.builder("hello");
     let first_style = Style {
-        underline: Decoration::solid(None),
+        underline: Decoration::solid(),
         ..Style::default()
     };
     first.span(Range::new(0, 5), first_style);
@@ -991,7 +991,7 @@ fn style_span_changes_cache_key() {
 
     let mut second = system.builder("hello");
     let second_style = Style {
-        strikethrough: Decoration::solid(None),
+        strikethrough: Decoration::solid(),
         ..Style::default()
     };
     second.span(Range::new(0, 5), second_style);
@@ -1478,7 +1478,7 @@ fn glyph_runs_preserve_resolved_brush() {
     let style = Style {
         size: 20.0,
         brush,
-        underline: Decoration::solid(Some(decoration_brush)),
+        underline: Decoration::solid().with_brush(DecorationBrush::Color(decoration_brush)),
         ..Style::default()
     };
     let mut builder = system.builder("hello");
@@ -1736,7 +1736,8 @@ fn render_projection_draws_prepared_glyph_runs() {
 fn render_projection_encodes_decorations() {
     let mut system = System::default();
     let style = Style {
-        underline: Decoration::solid(Some(Brush::color(1.0, 0.0, 0.0, 1.0))),
+        underline: Decoration::solid()
+            .with_brush(DecorationBrush::Color(Brush::color(1.0, 0.0, 0.0, 1.0))),
         ..Style::default()
     };
     let mut builder = system.builder("hello");
@@ -1755,6 +1756,65 @@ fn render_projection_encodes_decorations() {
 #[test]
 fn decoration_offsets_are_measured_from_baseline() {
     assert_eq!(decoration_top(20.0, 3.0), 17.0);
+}
+
+#[test]
+fn typed_decoration_values_project_to_layout_runs() {
+    let mut system = System::default();
+    let brush = Brush::color(0.2, 0.4, 0.6, 1.0);
+    let decoration_brush = Brush::color(0.7, 0.2, 0.1, 1.0);
+    let style = Style {
+        brush,
+        underline: Decoration::solid()
+            .with_offset(DecorationOffset::try_absolute(2.0).expect("offset is finite"))
+            .with_thickness(DecorationThickness::try_absolute(1.5).expect("thickness is positive"))
+            .with_brush(DecorationBrush::Color(decoration_brush)),
+        ..Style::default()
+    };
+    let mut builder = system.builder("decor");
+    builder.default_style(style);
+
+    let layout = builder.build().expect("typed decoration should build");
+    let underline = layout
+        .decorations()
+        .into_iter()
+        .find(|decoration| decoration.kind() == DecorationKind::Underline)
+        .expect("underline decoration should project");
+
+    assert_eq!(underline.brush(), decoration_brush);
+    assert_eq!(underline.rect().size.height, 1.5);
+}
+
+#[test]
+fn decoration_text_color_brush_uses_resolved_run_brush() {
+    let mut system = System::default();
+    let brush = Brush::color(0.2, 0.4, 0.6, 1.0);
+    let style = Style {
+        brush,
+        underline: Decoration::solid(),
+        ..Style::default()
+    };
+    let mut builder = system.builder("decor");
+    builder.default_style(style);
+
+    let layout = builder.build().expect("text-color decoration should build");
+    let underline = layout
+        .decorations()
+        .into_iter()
+        .find(|decoration| decoration.kind() == DecorationKind::Underline)
+        .expect("underline decoration should project");
+
+    assert_eq!(underline.brush(), brush);
+}
+
+#[test]
+fn decoration_metric_values_reject_invalid_numbers() {
+    let nan_offset = DecorationOffset::try_absolute(f32::NAN).expect_err("nan offset is invalid");
+    let zero_thickness =
+        DecorationThickness::try_absolute(0.0).expect_err("zero thickness is invalid");
+
+    assert_eq!(nan_offset.code, ErrorCode::InvalidStyle);
+    assert_eq!(zero_thickness.code, ErrorCode::InvalidStyle);
 }
 
 #[cfg(feature = "text-accessibility")]
