@@ -1,5 +1,7 @@
 use std::{error, fmt};
 
+use super::{TextStyleFeature, UnsupportedTextStyleReason};
+
 /// Text crate result alias.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -74,6 +76,10 @@ pub enum ErrorDetail {
         field: &'static str,
         value: f32,
         requirement: NumericRequirement,
+    },
+    UnsupportedTextStyle {
+        feature: TextStyleFeature,
+        reason: UnsupportedTextStyleReason,
     },
     UnsupportedCombination {
         feature: &'static str,

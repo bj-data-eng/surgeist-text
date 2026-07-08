@@ -1,6 +1,9 @@
 use parley::{FontFamilyName, FontFeature, FontStyle, FontVariation, FontWeight, FontWidth};
 
-use super::{Error, ErrorCode, ErrorDetail, NumericRequirement, Result};
+use super::{
+    Error, ErrorCode, ErrorDetail, NumericRequirement, Result, TextStyleFeature,
+    UnsupportedTextStyleReason,
+};
 
 /// RGBA brush in text-space terms.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -414,9 +417,9 @@ fn validate_style(style: &Style) -> Result<ParsedStyle> {
             ErrorCode::UnsupportedFeature,
             "explicit text direction is not supported until Parley exposes public base-direction controls",
         )
-        .with_detail(ErrorDetail::UnsupportedCombination {
-            feature: "text direction",
-            reason: "explicit text direction is not supported until Parley exposes public base-direction controls",
+        .with_detail(ErrorDetail::UnsupportedTextStyle {
+            feature: TextStyleFeature::ExplicitTextDirection,
+            reason: UnsupportedTextStyleReason::RequiresParleyBaseDirection,
         }));
     }
     if style.white_space != WhiteSpace::Preserve {
@@ -424,9 +427,9 @@ fn validate_style(style: &Style) -> Result<ParsedStyle> {
             ErrorCode::UnsupportedFeature,
             "whitespace collapse is not supported until text layout preserves authored source ranges",
         )
-        .with_detail(ErrorDetail::UnsupportedCombination {
-            feature: "whitespace collapse",
-            reason: "whitespace collapse is not supported until text layout preserves authored source ranges",
+        .with_detail(ErrorDetail::UnsupportedTextStyle {
+            feature: TextStyleFeature::WhiteSpaceCollapse,
+            reason: UnsupportedTextStyleReason::RequiresSourceRangePreservation,
         }));
     }
     validate_positive_f32(style.size, "font size")?;

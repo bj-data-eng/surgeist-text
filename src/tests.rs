@@ -350,6 +350,26 @@ fn text_style_support_matrix_reports_current_support() {
 }
 
 #[test]
+fn unsupported_text_style_errors_are_typed() {
+    let style = Style {
+        direction: Direction::LeftToRight,
+        ..Style::default()
+    };
+
+    let error =
+        ValidatedStyle::try_from(style).expect_err("explicit direction should remain unsupported");
+
+    assert_eq!(error.code, ErrorCode::UnsupportedFeature);
+    assert_eq!(
+        error.detail(),
+        Some(&ErrorDetail::UnsupportedTextStyle {
+            feature: TextStyleFeature::ExplicitTextDirection,
+            reason: UnsupportedTextStyleReason::RequiresParleyBaseDirection,
+        })
+    );
+}
+
+#[test]
 fn whitespace_collapse_reports_explicit_error() {
     let mut system = System::default();
     let style = Style {
@@ -365,6 +385,13 @@ fn whitespace_collapse_reports_explicit_error() {
 
     assert_eq!(error.code, ErrorCode::UnsupportedFeature);
     assert!(error.message.contains("whitespace collapse"));
+    assert_eq!(
+        error.detail(),
+        Some(&ErrorDetail::UnsupportedTextStyle {
+            feature: TextStyleFeature::WhiteSpaceCollapse,
+            reason: UnsupportedTextStyleReason::RequiresSourceRangePreservation,
+        })
+    );
 }
 
 #[test]
@@ -455,6 +482,13 @@ fn rejects_each_line_indent_without_first_line_scope() {
         .expect_err("unsupported indent combination should fail");
 
     assert_eq!(error.code, ErrorCode::UnsupportedFeature);
+    assert_eq!(
+        error.detail(),
+        Some(&ErrorDetail::UnsupportedTextStyle {
+            feature: TextStyleFeature::TextIndent,
+            reason: UnsupportedTextStyleReason::IndentShapeNotExpressibleByCurrentBackend,
+        })
+    );
 }
 
 #[test]
@@ -472,6 +506,36 @@ fn validated_options_reject_unsupported_indent_shape() {
     let error = ValidatedOptions::try_from(options).expect_err("unsupported shape should fail");
 
     assert_eq!(error.code, ErrorCode::UnsupportedFeature);
+    assert_eq!(
+        error.detail(),
+        Some(&ErrorDetail::UnsupportedTextStyle {
+            feature: TextStyleFeature::TextIndent,
+            reason: UnsupportedTextStyleReason::IndentShapeNotExpressibleByCurrentBackend,
+        })
+    );
+}
+
+#[test]
+fn public_text_style_contract_is_enumerable() {
+    let unsupported: Vec<_> = TextStyleFeature::ALL
+        .iter()
+        .copied()
+        .filter(|feature| matches!(feature.support(), TextStyleSupport::Unsupported(_)))
+        .collect();
+
+    assert!(TextStyleFeature::ALL.contains(&TextStyleFeature::ExplicitTextDirection));
+    assert!(TextStyleFeature::ALL.contains(&TextStyleFeature::WhiteSpaceCollapse));
+    assert!(unsupported.contains(&TextStyleFeature::ExplicitTextDirection));
+    assert!(unsupported.contains(&TextStyleFeature::WhiteSpaceCollapse));
+    assert!(unsupported.contains(&TextStyleFeature::FontVariant));
+    assert!(unsupported.contains(&TextStyleFeature::TextOverflow));
+    assert!(unsupported.contains(&TextStyleFeature::VerticalAlign));
+    assert!(unsupported.contains(&TextStyleFeature::SelectionColor));
+    assert_eq!(
+        TextStyleFeature::TextIndent.support(),
+        TextStyleSupport::Supported,
+        "text indent is generally supported; only one value shape is rejected"
+    );
 }
 
 #[test]

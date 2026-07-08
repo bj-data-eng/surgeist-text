@@ -1,4 +1,7 @@
-use super::{Error, ErrorCode, ErrorDetail, NumericRequirement, Result};
+use super::{
+    Error, ErrorCode, ErrorDetail, NumericRequirement, Result, TextStyleFeature,
+    UnsupportedTextStyleReason,
+};
 
 /// Paragraph-level layout options.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -179,9 +182,9 @@ fn parley_indent_options(indent: Indent) -> Result<Option<(f32, parley::IndentOp
             ErrorCode::UnsupportedFeature,
             "each-line indent without first-line indent is not expressible through Parley",
         )
-        .with_detail(ErrorDetail::UnsupportedCombination {
-            feature: "text indent",
-            reason: "each-line indent without first-line indent is not expressible through Parley",
+        .with_detail(ErrorDetail::UnsupportedTextStyle {
+            feature: TextStyleFeature::TextIndent,
+            reason: UnsupportedTextStyleReason::IndentShapeNotExpressibleByCurrentBackend,
         }));
     }
     Ok(Some((
