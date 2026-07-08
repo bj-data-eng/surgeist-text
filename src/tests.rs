@@ -322,6 +322,34 @@ fn default_style_preserves_authored_whitespace() {
 }
 
 #[test]
+fn text_style_support_matrix_reports_current_support() {
+    assert_eq!(
+        TextStyleFeature::FontFamilyList.support(),
+        TextStyleSupport::Supported
+    );
+    assert_eq!(
+        TextStyleFeature::FontSize.support(),
+        TextStyleSupport::Supported
+    );
+    assert_eq!(
+        TextStyleFeature::WhiteSpacePreserve.support(),
+        TextStyleSupport::Supported
+    );
+    assert_eq!(
+        TextStyleFeature::WhiteSpaceCollapse.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresSourceRangePreservation)
+    );
+    assert_eq!(
+        TextStyleFeature::TextOverflow.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresTextFlowPolicy)
+    );
+    assert!(
+        TextStyleFeature::ALL.contains(&TextStyleFeature::SelectionColor),
+        "root should be able to enumerate selection color support"
+    );
+}
+
+#[test]
 fn whitespace_collapse_reports_explicit_error() {
     let mut system = System::default();
     let style = Style {

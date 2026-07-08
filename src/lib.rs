@@ -17,6 +17,7 @@ mod range;
 #[path = "source.rs"]
 mod source_model;
 mod style;
+mod style_support;
 mod system;
 
 pub use cache::{FontGeneration, Key, OptionsKey, SourceKey, Stats, StyleKey};
@@ -41,6 +42,7 @@ pub use style::{
     Brush, Decoration, Direction, Font, LineHeight, OverflowWrap, Slant, Style, ValidatedStyle,
     Weight, WhiteSpace, Width, WordBreak, Wrap,
 };
+pub use style_support::{TextStyleFeature, TextStyleSupport, UnsupportedTextStyleReason};
 pub use system::{Builder, System, SystemOptions};
 
 #[cfg(test)]
