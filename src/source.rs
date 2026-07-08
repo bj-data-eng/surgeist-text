@@ -329,8 +329,9 @@ impl InlineBox {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum VerticalAlign {
+    #[default]
     Baseline,
     TextTop,
     TextBottom,
@@ -348,12 +349,6 @@ impl VerticalAlign {
 
     pub fn try_shift(value: f32) -> Result<Self> {
         Ok(Self::Shift(BaselineShift::try_new(value)?))
-    }
-}
-
-impl Default for VerticalAlign {
-    fn default() -> Self {
-        Self::Baseline
     }
 }
 
