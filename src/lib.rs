@@ -30,8 +30,8 @@ pub use id::Id;
 pub use layout::Accessibility;
 pub use layout::{
     Affinity, Cluster, Cursor, CursorGeometry, DecorationKind, DecorationRun, FontData, FontRef,
-    Glyph, Hit, Layout, Line, Metrics, Movement, PositionedInlineBox, Run, RunMetrics, Selection,
-    SelectionGeometry, SelectionRect,
+    Glyph, Hit, Layout, Line, Metrics, Movement, PaintedSelectionGeometry, PaintedSelectionRect,
+    PositionedInlineBox, Run, RunMetrics, Selection, SelectionGeometry, SelectionRect,
 };
 pub use options::{Alignment, Indent, Options, TextAlignLast, TextOverflow, ValidatedOptions};
 pub use range::{Range, SourcePosition, SourceRange};
@@ -41,8 +41,8 @@ pub use source_model::{
 pub use style::{
     Brush, Decoration, DecorationBrush, DecorationOffset, DecorationOffsetValue,
     DecorationThickness, DecorationThicknessValue, Direction, Font, FontVariant, FontWeightValue,
-    FontWidthRatio, LineHeight, OverflowWrap, Slant, Style, TextTransform, ValidatedStyle, Weight,
-    WhiteSpace, Width, WordBreak, Wrap,
+    FontWidthRatio, LineHeight, OverflowWrap, SelectionPaint, Slant, Style, TextTransform,
+    ValidatedStyle, Weight, WhiteSpace, Width, WordBreak, Wrap,
 };
 pub use style_support::{TextStyleFeature, TextStyleSupport, UnsupportedTextStyleReason};
 pub use system::{Builder, System, SystemOptions};

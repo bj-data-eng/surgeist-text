@@ -27,6 +27,24 @@ impl Default for Brush {
     }
 }
 
+/// Concrete paint paired with selection geometry.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SelectionPaint {
+    brush: Brush,
+}
+
+impl SelectionPaint {
+    pub fn try_color(brush: Brush) -> Result<Self> {
+        validate_brush(brush, "selection brush")?;
+        Ok(Self { brush })
+    }
+
+    #[must_use]
+    pub const fn brush(self) -> Brush {
+        self.brush
+    }
+}
+
 /// Font request.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Font {
@@ -762,6 +780,10 @@ fn brush_channel_field(name: &str, channel: &str) -> &'static str {
         ("strikethrough brush", "green") => "strikethrough brush green channel",
         ("strikethrough brush", "blue") => "strikethrough brush blue channel",
         ("strikethrough brush", "alpha") => "strikethrough brush alpha channel",
+        ("selection brush", "red") => "selection brush red channel",
+        ("selection brush", "green") => "selection brush green channel",
+        ("selection brush", "blue") => "selection brush blue channel",
+        ("selection brush", "alpha") => "selection brush alpha channel",
         _ => "brush channel",
     }
 }

@@ -111,7 +111,8 @@ impl TextStyleFeature {
             | Self::Strikethrough
             | Self::DecorationOffset
             | Self::DecorationThickness
-            | Self::ConcreteDecorationColor => TextStyleSupport::Supported,
+            | Self::ConcreteDecorationColor
+            | Self::SelectionColor => TextStyleSupport::Supported,
             Self::ExplicitTextDirection => TextStyleSupport::Unsupported(
                 UnsupportedTextStyleReason::RequiresParleyBaseDirection,
             ),
@@ -124,11 +125,9 @@ impl TextStyleFeature {
             Self::TextAlignLast | Self::TextOverflow | Self::TextTransform => {
                 TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresTextFlowPolicy)
             }
-            Self::Overline | Self::DecorationStyle | Self::SelectionColor => {
-                TextStyleSupport::Unsupported(
-                    UnsupportedTextStyleReason::RequiresDecorationSelectionPolicy,
-                )
-            }
+            Self::Overline | Self::DecorationStyle => TextStyleSupport::Unsupported(
+                UnsupportedTextStyleReason::RequiresDecorationSelectionPolicy,
+            ),
             Self::SymbolicTextColor | Self::SymbolicDecorationColor => {
                 TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresColorResolution)
             }

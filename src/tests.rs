@@ -777,7 +777,12 @@ fn public_text_style_contract_is_enumerable() {
     assert!(unsupported.contains(&TextStyleFeature::FontVariant));
     assert!(unsupported.contains(&TextStyleFeature::TextOverflow));
     assert!(unsupported.contains(&TextStyleFeature::VerticalAlign));
-    assert!(unsupported.contains(&TextStyleFeature::SelectionColor));
+    assert!(!unsupported.contains(&TextStyleFeature::SelectionColor));
+    assert_eq!(
+        TextStyleFeature::SelectionColor.support(),
+        TextStyleSupport::Supported,
+        "concrete selection color is projected through SelectionPaint"
+    );
     assert_eq!(
         TextStyleFeature::TextIndent.support(),
         TextStyleSupport::Supported,
@@ -1067,6 +1072,64 @@ fn selection_geometry_for_non_empty_range() {
     );
 
     assert!(!layout.selection(selection).rects().is_empty());
+}
+
+#[test]
+fn selection_paint_projects_concrete_brush_with_geometry() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello world");
+    let layout = builder.build().expect("layout should build");
+    let paint =
+        SelectionPaint::try_color(Brush::color(0.1, 0.2, 0.9, 0.5)).expect("paint is valid");
+    let selection = Selection::new(
+        Cursor::new(0, Affinity::After),
+        Cursor::new(5, Affinity::Before),
+    );
+
+    let painted = layout.painted_selection(selection, paint);
+
+    assert_eq!(
+        painted.rects().len(),
+        layout.selection(selection).rects().len()
+    );
+    assert!(
+        painted
+            .rects()
+            .iter()
+            .all(|rect| rect.paint() == paint && rect.line() < layout.metrics().line_count())
+    );
+}
+
+#[test]
+fn selection_paint_rejects_invalid_brush() {
+    let error = SelectionPaint::try_color(Brush::color(f32::NAN, 0.0, 0.0, 1.0))
+        .expect_err("invalid selection brush should fail");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+}
+
+#[test]
+fn support_matrix_reports_concrete_selection_color_supported() {
+    assert_eq!(
+        TextStyleFeature::SelectionColor.support(),
+        TextStyleSupport::Supported
+    );
+    assert_eq!(
+        TextStyleFeature::Overline.support(),
+        TextStyleSupport::Unsupported(
+            UnsupportedTextStyleReason::RequiresDecorationSelectionPolicy
+        )
+    );
+    assert_eq!(
+        TextStyleFeature::DecorationStyle.support(),
+        TextStyleSupport::Unsupported(
+            UnsupportedTextStyleReason::RequiresDecorationSelectionPolicy
+        )
+    );
+    assert_eq!(
+        TextStyleFeature::SymbolicDecorationColor.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresColorResolution)
+    );
 }
 
 #[test]

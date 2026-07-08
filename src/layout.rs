@@ -4,7 +4,8 @@ use parley::PositionedLayoutItem;
 
 use super::geometry::rect_from_bounds;
 use super::{
-    Brush, Direction, Edit, Id, InlineBoxKind, Key, Point, Range, Rect, Result, Size, Source, Style,
+    Brush, Direction, Edit, Id, InlineBoxKind, Key, Point, Range, Rect, Result, SelectionPaint,
+    Size, Source, Style,
 };
 
 /// Immutable shaped and line-broken layout.
@@ -293,6 +294,20 @@ impl Layout {
                 .geometry(&self.inner)
                 .into_iter()
                 .map(|(bounds, line)| SelectionRect::new(rect_from_bounds(bounds), line))
+                .collect(),
+        )
+    }
+
+    pub fn painted_selection(
+        &self,
+        selection: Selection,
+        paint: SelectionPaint,
+    ) -> PaintedSelectionGeometry {
+        PaintedSelectionGeometry::new(
+            self.selection(selection)
+                .rects()
+                .iter()
+                .map(|rect| PaintedSelectionRect::new(rect.rect(), rect.line(), paint))
                 .collect(),
         )
     }
@@ -1151,6 +1166,23 @@ impl SelectionGeometry {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PaintedSelectionGeometry {
+    rects: Vec<PaintedSelectionRect>,
+}
+
+impl PaintedSelectionGeometry {
+    #[must_use]
+    pub fn new(rects: Vec<PaintedSelectionRect>) -> Self {
+        Self { rects }
+    }
+
+    #[must_use]
+    pub fn rects(&self) -> &[PaintedSelectionRect] {
+        &self.rects
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SelectionRect {
     rect: Rect,
@@ -1171,6 +1203,35 @@ impl SelectionRect {
     #[must_use]
     pub const fn line(self) -> usize {
         self.line
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PaintedSelectionRect {
+    rect: Rect,
+    line: usize,
+    paint: SelectionPaint,
+}
+
+impl PaintedSelectionRect {
+    #[must_use]
+    pub const fn new(rect: Rect, line: usize, paint: SelectionPaint) -> Self {
+        Self { rect, line, paint }
+    }
+
+    #[must_use]
+    pub const fn rect(self) -> Rect {
+        self.rect
+    }
+
+    #[must_use]
+    pub const fn line(self) -> usize {
+        self.line
+    }
+
+    #[must_use]
+    pub const fn paint(self) -> SelectionPaint {
+        self.paint
     }
 }
 
