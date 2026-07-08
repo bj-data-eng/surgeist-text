@@ -231,6 +231,50 @@ fn passes_font_fallbacks_features_and_variations_to_parley() {
 }
 
 #[test]
+fn numeric_font_weight_shapes_and_changes_cache_key() {
+    let mut system = System::default();
+    let first_style = Style {
+        font: Font::new().weight(Weight::Number(
+            FontWeightValue::try_new(450.0).expect("weight is valid"),
+        )),
+        ..Style::default()
+    };
+    let second_style = Style {
+        font: Font::new().weight(Weight::Number(
+            FontWeightValue::try_new(500.0).expect("weight is valid"),
+        )),
+        ..Style::default()
+    };
+
+    let mut first = system.builder("weight");
+    first.default_style(first_style);
+    let first = first.build().expect("numeric weight should shape");
+
+    let mut second = system.builder("weight");
+    second.default_style(second_style);
+    let second = second.build().expect("numeric weight should shape");
+
+    assert_ne!(first.key(), second.key());
+}
+
+#[test]
+fn font_weight_value_rejects_invalid_values() {
+    let zero = FontWeightValue::try_new(0.0).expect_err("zero weight is invalid");
+    let nan = FontWeightValue::try_new(f32::NAN).expect_err("nan weight is invalid");
+
+    assert_eq!(zero.code, ErrorCode::InvalidStyle);
+    assert_eq!(nan.code, ErrorCode::InvalidStyle);
+}
+
+#[test]
+fn text_style_support_reports_numeric_font_weight_supported() {
+    assert_eq!(
+        TextStyleFeature::NumericFontWeight.support(),
+        TextStyleSupport::Supported
+    );
+}
+
+#[test]
 fn rejects_invalid_font_settings() {
     let mut system = System::default();
     let style = Style {

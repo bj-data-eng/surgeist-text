@@ -88,6 +88,7 @@ impl TextStyleFeature {
         match self {
             Self::FontFamilyList
             | Self::NamedFontWeight
+            | Self::NumericFontWeight
             | Self::BasicFontStretch
             | Self::FontStyle
             | Self::ObliqueSlant
@@ -116,7 +117,7 @@ impl TextStyleFeature {
             Self::WhiteSpaceCollapse => TextStyleSupport::Unsupported(
                 UnsupportedTextStyleReason::RequiresSourceRangePreservation,
             ),
-            Self::NumericFontWeight | Self::ExpandedFontStretch | Self::FontVariant => {
+            Self::ExpandedFontStretch | Self::FontVariant => {
                 TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresFontPolicy)
             }
             Self::TextAlignLast | Self::TextOverflow | Self::TextTransform => {

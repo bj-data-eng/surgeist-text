@@ -94,7 +94,22 @@ impl Default for Font {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FontWeightValue(f32);
+
+impl FontWeightValue {
+    pub fn try_new(value: f32) -> Result<Self> {
+        validate_positive_f32(value, "font weight")?;
+        Ok(Self(value))
+    }
+
+    #[must_use]
+    pub const fn get(self) -> f32 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Weight {
     Thin,
     ExtraLight,
@@ -105,6 +120,7 @@ pub enum Weight {
     Bold,
     ExtraBold,
     Black,
+    Number(FontWeightValue),
 }
 
 impl From<Weight> for FontWeight {
@@ -119,6 +135,7 @@ impl From<Weight> for FontWeight {
             Weight::Bold => Self::BOLD,
             Weight::ExtraBold => Self::EXTRA_BOLD,
             Weight::Black => Self::BLACK,
+            Weight::Number(value) => Self::new(value.get()),
         }
     }
 }
@@ -551,6 +568,7 @@ fn numeric_field(name: &str) -> &'static str {
         "metrics-relative line height" => "metrics-relative line height",
         "font-size-relative line height" => "font-size-relative line height",
         "absolute line height" => "absolute line height",
+        "font weight" => "font weight",
         "letter spacing" => "letter spacing",
         "word spacing" => "word spacing",
         "oblique angle" => "oblique angle",

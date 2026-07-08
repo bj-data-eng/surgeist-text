@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 use super::source_model::ValidatedSpan;
 use super::{
     Brush, Decoration, Font, Id, Indent, InlineBox, LineHeight, Options, Size, Slant, Source,
-    SourceRevision, Style, ValidatedOptions, ValidatedSource, ValidatedStyle,
+    SourceRevision, Style, ValidatedOptions, ValidatedSource, ValidatedStyle, Weight,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -271,11 +271,18 @@ fn hash_style<H: Hasher>(style: &Style, hasher: &mut H) {
 
 fn hash_font<H: Hasher>(font: &Font, hasher: &mut H) {
     font.family.hash(hasher);
-    font.weight.hash(hasher);
+    hash_weight(font.weight, hasher);
     font.width.hash(hasher);
     hash_slant(font.slant, hasher);
     font.features.hash(hasher);
     font.variations.hash(hasher);
+}
+
+fn hash_weight<H: Hasher>(weight: Weight, hasher: &mut H) {
+    std::mem::discriminant(&weight).hash(hasher);
+    if let Weight::Number(value) = weight {
+        hash_f32(value.get(), hasher);
+    }
 }
 
 fn hash_slant<H: Hasher>(slant: Slant, hasher: &mut H) {
