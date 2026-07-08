@@ -182,6 +182,91 @@ fn overflow_wrap_anywhere_breaks_unspaced_text() {
 }
 
 #[test]
+fn supported_flow_controls_have_distinct_cache_keys() {
+    let mut system = System::default();
+    let normal = system
+        .builder("alpha beta gamma")
+        .build()
+        .expect("normal flow should build");
+
+    let mut nowrap_builder = system.builder("alpha beta gamma");
+    nowrap_builder.default_style(Style {
+        wrap: Wrap::None,
+        ..Style::default()
+    });
+    let nowrap = nowrap_builder.build().expect("nowrap flow should build");
+
+    let mut break_all_builder = system.builder("alpha beta gamma");
+    break_all_builder.default_style(Style {
+        word_break: WordBreak::BreakAll,
+        ..Style::default()
+    });
+    let break_all = break_all_builder
+        .build()
+        .expect("break-all flow should build");
+
+    let mut anywhere_builder = system.builder("alpha beta gamma");
+    anywhere_builder.default_style(Style {
+        overflow_wrap: OverflowWrap::Anywhere,
+        ..Style::default()
+    });
+    let anywhere = anywhere_builder
+        .build()
+        .expect("anywhere flow should build");
+
+    assert_ne!(normal.key(), nowrap.key());
+    assert_ne!(normal.key(), break_all.key());
+    assert_ne!(normal.key(), anywhere.key());
+}
+
+#[test]
+fn preserve_whitespace_flow_keeps_source_ranges_stable() {
+    let mut system = System::default();
+    let mut builder = system.builder("a  b\nc");
+    builder.default_style(Style {
+        white_space: WhiteSpace::Preserve,
+        ..Style::default()
+    });
+
+    let layout = builder.build().expect("preserved whitespace should build");
+    let clusters = layout.clusters();
+
+    assert_eq!(layout.source().text(), "a  b\nc");
+    assert!(
+        clusters
+            .iter()
+            .any(|cluster| cluster.range() == Range::new(0, 1)),
+        "cluster ranges should continue to point at authored source"
+    );
+    assert!(
+        clusters
+            .iter()
+            .all(|cluster| cluster.range().end <= layout.source().text().len()),
+        "cluster ranges must stay within authored source text"
+    );
+}
+
+#[test]
+fn flow_policy_support_matrix_keeps_behavior_gaps_unsupported() {
+    assert_eq!(
+        TextStyleFeature::TextOverflow.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresTextFlowPolicy)
+    );
+    assert_eq!(
+        TextStyleFeature::TextAlignLast.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresTextFlowPolicy)
+    );
+    assert_eq!(
+        TextStyleFeature::TextTransform.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresTextFlowPolicy)
+    );
+    assert_eq!(
+        TextStyleFeature::WhiteSpaceCollapse.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresSourceRangePreservation)
+    );
+}
+
+#[test]
 fn passes_valid_locale_to_parley() {
     let mut system = System::default();
     let style = Style {
