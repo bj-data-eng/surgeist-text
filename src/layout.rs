@@ -5,7 +5,7 @@ use parley::PositionedLayoutItem;
 use super::geometry::rect_from_bounds;
 use super::{
     Brush, Direction, Edit, Id, InlineBoxKind, Key, Point, Range, Rect, Result, SelectionPaint,
-    Size, Source, Style,
+    Size, Source, Style, VerticalAlign,
 };
 
 /// Immutable shaped and line-broken layout.
@@ -163,23 +163,32 @@ impl Layout {
     pub fn inline_boxes(&self) -> Vec<PositionedInlineBox> {
         self.inner
             .lines()
-            .flat_map(|line| line.items())
-            .filter_map(|item| match item {
-                PositionedLayoutItem::InlineBox(box_) => Some(PositionedInlineBox::new(
-                    Id::from_u64(box_.id),
-                    match box_.kind {
-                        parley::InlineBoxKind::InFlow => InlineBoxKind::InFlow,
-                        parley::InlineBoxKind::OutOfFlow
-                        | parley::InlineBoxKind::CustomOutOfFlow => InlineBoxKind::OutOfFlow,
-                    },
-                    Rect::new(box_.x, box_.y, box_.width, box_.height),
-                    self.source
+            .enumerate()
+            .flat_map(|(line_index, line)| {
+                line.items().filter_map(move |item| {
+                    let PositionedLayoutItem::InlineBox(box_) = item else {
+                        return None;
+                    };
+                    let source_box = self
+                        .source
                         .boxes
                         .iter()
-                        .find(|source_box| source_box.id.as_u64() == box_.id)
-                        .map_or(0, |source_box| source_box.index),
-                )),
-                PositionedLayoutItem::GlyphRun(_) => None,
+                        .find(|source_box| source_box.id.as_u64() == box_.id);
+                    Some(PositionedInlineBox::new(
+                        Id::from_u64(box_.id),
+                        match box_.kind {
+                            parley::InlineBoxKind::InFlow => InlineBoxKind::InFlow,
+                            parley::InlineBoxKind::OutOfFlow
+                            | parley::InlineBoxKind::CustomOutOfFlow => InlineBoxKind::OutOfFlow,
+                        },
+                        Rect::new(box_.x, box_.y, box_.width, box_.height),
+                        source_box.map_or(0, |source_box| source_box.index),
+                        source_box.map_or(VerticalAlign::Baseline, |source_box| {
+                            source_box.vertical_align
+                        }),
+                        line_index,
+                    ))
+                })
             })
             .collect()
     }
@@ -924,16 +933,27 @@ pub struct PositionedInlineBox {
     kind: InlineBoxKind,
     rect: Rect,
     index: usize,
+    vertical_align: VerticalAlign,
+    line: usize,
 }
 
 impl PositionedInlineBox {
     #[must_use]
-    pub const fn new(id: Id, kind: InlineBoxKind, rect: Rect, index: usize) -> Self {
+    pub const fn new(
+        id: Id,
+        kind: InlineBoxKind,
+        rect: Rect,
+        index: usize,
+        vertical_align: VerticalAlign,
+        line: usize,
+    ) -> Self {
         Self {
             id,
             kind,
             rect,
             index,
+            vertical_align,
+            line,
         }
     }
 
@@ -955,6 +975,16 @@ impl PositionedInlineBox {
     #[must_use]
     pub const fn index(self) -> usize {
         self.index
+    }
+
+    #[must_use]
+    pub const fn vertical_align(self) -> VerticalAlign {
+        self.vertical_align
+    }
+
+    #[must_use]
+    pub const fn line(self) -> usize {
+        self.line
     }
 }
 

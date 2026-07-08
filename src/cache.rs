@@ -4,7 +4,7 @@ use super::source_model::ValidatedSpan;
 use super::{
     Brush, Decoration, DecorationBrush, DecorationOffset, DecorationThickness, Font, Id, Indent,
     InlineBox, LineHeight, Options, Size, Slant, Source, SourceRevision, Style, ValidatedOptions,
-    ValidatedSource, ValidatedStyle, Weight, Width,
+    ValidatedSource, ValidatedStyle, VerticalAlign, Weight, Width,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -253,6 +253,7 @@ fn hash_inline_box<H: Hasher>(box_: InlineBox, hasher: &mut H) {
     box_.kind.hash(hasher);
     box_.index.hash(hasher);
     hash_size(box_.size, hasher);
+    hash_vertical_align(box_.vertical_align, hasher);
 }
 
 fn hash_style<H: Hasher>(style: &Style, hasher: &mut H) {
@@ -293,6 +294,13 @@ fn hash_weight<H: Hasher>(weight: Weight, hasher: &mut H) {
 fn hash_width<H: Hasher>(width: Width, hasher: &mut H) {
     std::mem::discriminant(&width).hash(hasher);
     if let Width::Ratio(value) = width {
+        hash_f32(value.get(), hasher);
+    }
+}
+
+fn hash_vertical_align<H: Hasher>(vertical_align: VerticalAlign, hasher: &mut H) {
+    std::mem::discriminant(&vertical_align).hash(hasher);
+    if let VerticalAlign::Shift(value) = vertical_align {
         hash_f32(value.get(), hasher);
     }
 }

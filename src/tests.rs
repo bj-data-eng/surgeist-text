@@ -1306,6 +1306,63 @@ fn out_of_flow_inline_box_preserves_metrics_and_reports_anchor() {
 }
 
 #[test]
+fn positioned_inline_boxes_preserve_requested_vertical_align_and_line() {
+    let mut system = System::default();
+    let mut builder = system.builder("a\nb");
+    builder.inline_box(
+        InlineBox::new(
+            Id::from_u64(7),
+            InlineBoxKind::InFlow,
+            2,
+            Size::new(6.0, 9.0),
+        )
+        .with_vertical_align(VerticalAlign::Super),
+    );
+
+    let layout = builder.build().expect("inline box layout should build");
+    let boxes = layout.inline_boxes();
+
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].id(), Id::from_u64(7));
+    assert_eq!(boxes[0].line(), 1);
+    assert_eq!(boxes[0].vertical_align(), VerticalAlign::Super);
+}
+
+#[test]
+fn inline_box_vertical_align_changes_source_cache_key() {
+    let mut baseline = Source::new("ab");
+    baseline.inline_box(InlineBox::new(
+        Id::from_u64(9),
+        InlineBoxKind::InFlow,
+        1,
+        Size::new(4.0, 5.0),
+    ));
+
+    let mut shifted = Source::new("ab");
+    shifted.inline_box(
+        InlineBox::new(
+            Id::from_u64(9),
+            InlineBoxKind::InFlow,
+            1,
+            Size::new(4.0, 5.0),
+        )
+        .with_vertical_align(VerticalAlign::try_shift(2.0).expect("finite shift")),
+    );
+
+    let options = ValidatedOptions::try_from(Options::default()).expect("valid options");
+    let style = ValidatedStyle::try_from(Style::default()).expect("valid style");
+    let baseline_source = ValidatedSource::try_from(baseline).expect("valid source");
+    let shifted_source = ValidatedSource::try_from(shifted).expect("valid source");
+
+    let baseline_key =
+        Key::from_validated(&baseline_source, &style, options, FontGeneration::initial());
+    let shifted_key =
+        Key::from_validated(&shifted_source, &style, options, FontGeneration::initial());
+
+    assert_ne!(baseline_key.source(), shifted_key.source());
+}
+
+#[test]
 fn hit_detects_inline_box() {
     let mut system = System::default();
     let mut builder = system.builder("hello world");
