@@ -772,12 +772,19 @@ fn public_text_style_contract_is_enumerable() {
 
     assert!(TextStyleFeature::ALL.contains(&TextStyleFeature::ExplicitTextDirection));
     assert!(TextStyleFeature::ALL.contains(&TextStyleFeature::WhiteSpaceCollapse));
+    assert!(TextStyleFeature::ALL.contains(&TextStyleFeature::InlineBoxVerticalAlign));
     assert!(unsupported.contains(&TextStyleFeature::ExplicitTextDirection));
     assert!(unsupported.contains(&TextStyleFeature::WhiteSpaceCollapse));
     assert!(unsupported.contains(&TextStyleFeature::FontVariant));
     assert!(unsupported.contains(&TextStyleFeature::TextOverflow));
     assert!(unsupported.contains(&TextStyleFeature::VerticalAlign));
+    assert!(!unsupported.contains(&TextStyleFeature::InlineBoxVerticalAlign));
     assert!(!unsupported.contains(&TextStyleFeature::SelectionColor));
+    assert_eq!(
+        TextStyleFeature::InlineBoxVerticalAlign.support(),
+        TextStyleSupport::Supported,
+        "text exposes vertical-align as requested inline-box alignment facts"
+    );
     assert_eq!(
         TextStyleFeature::SelectionColor.support(),
         TextStyleSupport::Supported,
@@ -1360,6 +1367,92 @@ fn inline_box_vertical_align_changes_source_cache_key() {
         Key::from_validated(&shifted_source, &style, options, FontGeneration::initial());
 
     assert_ne!(baseline_key.source(), shifted_key.source());
+}
+
+#[test]
+fn inline_metric_facts_report_lines_runs_and_inline_boxes() {
+    let mut system = System::default();
+    let mut builder = system.builder("hello world");
+    builder.inline_box(
+        InlineBox::new(
+            Id::from_u64(15),
+            InlineBoxKind::InFlow,
+            5,
+            Size::new(12.0, 7.0),
+        )
+        .with_vertical_align(VerticalAlign::Middle),
+    );
+
+    let layout = builder.build().expect("layout should build");
+    let facts = layout.inline_metric_facts();
+
+    assert_eq!(facts.metrics(), layout.metrics());
+    assert_eq!(facts.lines().len(), layout.lines().len());
+    assert_eq!(facts.runs().len(), layout.glyph_runs().len());
+    assert_eq!(facts.inline_boxes().len(), 1);
+    assert_eq!(facts.inline_boxes()[0].id(), Id::from_u64(15));
+    assert_eq!(
+        facts.inline_boxes()[0].vertical_align(),
+        VerticalAlign::Middle
+    );
+    assert_eq!(
+        facts.inline_boxes()[0].baseline_shift(),
+        BaselineShiftFact::BackendBottomOnBaseline
+    );
+}
+
+#[test]
+fn inline_metric_facts_report_requested_baseline_shift() {
+    let shift = BaselineShift::try_new(4.0).expect("finite shift");
+    let mut system = System::default();
+    let mut builder = system.builder("ab");
+    builder.inline_box(
+        InlineBox::new(
+            Id::from_u64(16),
+            InlineBoxKind::InFlow,
+            1,
+            Size::new(8.0, 8.0),
+        )
+        .with_vertical_align(VerticalAlign::Shift(shift)),
+    );
+
+    let layout = builder.build().expect("layout should build");
+    let facts = layout.inline_metric_facts();
+
+    assert_eq!(
+        facts.inline_boxes()[0].baseline_shift(),
+        BaselineShiftFact::Requested(shift)
+    );
+}
+
+#[test]
+fn support_matrix_reports_inline_box_vertical_align_supported() {
+    assert_eq!(
+        TextStyleFeature::InlineBoxVerticalAlign.support(),
+        TextStyleSupport::Supported
+    );
+    assert_eq!(
+        TextStyleFeature::VerticalAlign.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresBroadVerticalAlignPolicy)
+    );
+}
+
+#[test]
+fn inline_metric_facts_report_run_line_indices_at_line_boundaries() {
+    let mut system = System::default();
+    let layout = system
+        .builder("a\nb")
+        .build()
+        .expect("multiline layout should build");
+    let facts = layout.inline_metric_facts();
+
+    assert!(
+        facts
+            .runs()
+            .iter()
+            .any(|run| run.line() == 1 && run.range().start <= 2 && 2 < run.range().end),
+        "the run containing byte index 2 should be reported on the second line"
+    );
 }
 
 #[test]

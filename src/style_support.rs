@@ -28,6 +28,7 @@ pub enum TextStyleFeature {
     TextAlignment,
     TextAlignLast,
     TextIndent,
+    InlineBoxVerticalAlign,
     VerticalAlign,
     Underline,
     Strikethrough,
@@ -70,6 +71,7 @@ impl TextStyleFeature {
         Self::TextAlignment,
         Self::TextAlignLast,
         Self::TextIndent,
+        Self::InlineBoxVerticalAlign,
         Self::VerticalAlign,
         Self::Underline,
         Self::Strikethrough,
@@ -107,6 +109,7 @@ impl TextStyleFeature {
             | Self::OverflowWrap
             | Self::TextAlignment
             | Self::TextIndent
+            | Self::InlineBoxVerticalAlign
             | Self::Underline
             | Self::Strikethrough
             | Self::DecorationOffset
@@ -132,7 +135,7 @@ impl TextStyleFeature {
                 TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresColorResolution)
             }
             Self::VerticalAlign => TextStyleSupport::Unsupported(
-                UnsupportedTextStyleReason::RequiresInlineMetricContract,
+                UnsupportedTextStyleReason::RequiresBroadVerticalAlignPolicy,
             ),
         }
     }
@@ -153,5 +156,6 @@ pub enum UnsupportedTextStyleReason {
     RequiresDecorationSelectionPolicy,
     RequiresColorResolution,
     RequiresInlineMetricContract,
+    RequiresBroadVerticalAlignPolicy,
     IndentShapeNotExpressibleByCurrentBackend,
 }

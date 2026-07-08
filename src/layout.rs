@@ -4,8 +4,8 @@ use parley::PositionedLayoutItem;
 
 use super::geometry::rect_from_bounds;
 use super::{
-    Brush, Direction, Edit, Id, InlineBoxKind, Key, Point, Range, Rect, Result, SelectionPaint,
-    Size, Source, Style, VerticalAlign,
+    BaselineShift, Brush, Direction, Edit, Id, InlineBoxKind, Key, Point, Range, Rect, Result,
+    SelectionPaint, Size, Source, Style, VerticalAlign,
 };
 
 /// Immutable shaped and line-broken layout.
@@ -86,46 +86,89 @@ impl Layout {
     pub fn glyph_runs(&self) -> Vec<Run> {
         self.inner
             .lines()
-            .flat_map(|line| line.items())
-            .filter_map(|item| match item {
-                PositionedLayoutItem::GlyphRun(run) => {
-                    let run_range = run.run().text_range();
-                    let fallback_range = Range::new(run_range.start, run_range.end);
-                    let brush = run.style().brush;
-                    let mut ranges = run.run().visual_clusters().flat_map(|cluster| {
-                        let range = cluster.text_range();
-                        let range = Range::new(range.start, range.end);
-                        cluster.glyphs().map(move |_| range)
-                    });
-                    let glyphs: Vec<Glyph> = run
-                        .positioned_glyphs()
-                        .map(|glyph| {
-                            Glyph::new(
-                                glyph.id,
-                                glyph.x,
-                                glyph.y,
-                                glyph.advance,
-                                ranges.next().unwrap_or(fallback_range),
-                            )
-                        })
-                        .collect();
-                    let style = self.style_for_run(fallback_range, &glyphs, brush);
-                    Some(Run::new(
-                        FontRef::from_parley(run.run().font()),
-                        style,
-                        brush,
-                        RunMetrics::new(
-                            run.run().font_size(),
-                            run.baseline(),
-                            run.offset(),
-                            run.advance(),
-                        ),
-                        glyphs,
-                    ))
-                }
-                PositionedLayoutItem::InlineBox(_) => None,
+            .enumerate()
+            .flat_map(|(line_index, line)| {
+                line.items().filter_map(move |item| match item {
+                    PositionedLayoutItem::GlyphRun(run) => {
+                        let run_range = run.run().text_range();
+                        let fallback_range = Range::new(run_range.start, run_range.end);
+                        let brush = run.style().brush;
+                        let mut ranges = run.run().visual_clusters().flat_map(|cluster| {
+                            let range = cluster.text_range();
+                            let range = Range::new(range.start, range.end);
+                            cluster.glyphs().map(move |_| range)
+                        });
+                        let glyphs: Vec<Glyph> = run
+                            .positioned_glyphs()
+                            .map(|glyph| {
+                                Glyph::new(
+                                    glyph.id,
+                                    glyph.x,
+                                    glyph.y,
+                                    glyph.advance,
+                                    ranges.next().unwrap_or(fallback_range),
+                                )
+                            })
+                            .collect();
+                        let style = self.style_for_run(fallback_range, &glyphs, brush);
+                        Some(Run::new(
+                            line_index,
+                            fallback_range,
+                            FontRef::from_parley(run.run().font()),
+                            style,
+                            brush,
+                            RunMetrics::new(
+                                run.run().font_size(),
+                                run.baseline(),
+                                run.offset(),
+                                run.advance(),
+                            ),
+                            glyphs,
+                        ))
+                    }
+                    PositionedLayoutItem::InlineBox(_) => None,
+                })
             })
             .collect()
+    }
+
+    #[must_use]
+    pub fn inline_metric_facts(&self) -> InlineMetricFacts {
+        let lines = self.lines().into_iter().map(LineMetricFact::new).collect();
+        let runs = self
+            .glyph_runs()
+            .into_iter()
+            .map(|run| {
+                RunMetricFact::new(
+                    run.line(),
+                    run.range(),
+                    run.font_size(),
+                    run.baseline(),
+                    run.offset(),
+                    run.advance(),
+                )
+            })
+            .collect();
+        let inline_boxes = self
+            .inline_boxes()
+            .into_iter()
+            .map(|box_| {
+                InlineBoxMetricFact::new(
+                    box_.id(),
+                    box_.kind(),
+                    box_.index(),
+                    box_.rect(),
+                    box_.line(),
+                    box_.vertical_align(),
+                    match box_.vertical_align() {
+                        VerticalAlign::Shift(shift) => BaselineShiftFact::Requested(shift),
+                        _ => BaselineShiftFact::BackendBottomOnBaseline,
+                    },
+                )
+            })
+            .collect();
+
+        InlineMetricFacts::new(self.metrics(), lines, runs, inline_boxes)
     }
 
     fn style_for_run(&self, fallback_range: Range, glyphs: &[Glyph], brush: Brush) -> Style {
@@ -689,6 +732,8 @@ impl Line {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Run {
+    line: usize,
+    range: Range,
     font: FontRef,
     style: Style,
     brush: Brush,
@@ -699,6 +744,8 @@ pub struct Run {
 impl Run {
     #[must_use]
     pub fn new(
+        line: usize,
+        range: Range,
         font: FontRef,
         style: Style,
         brush: Brush,
@@ -706,6 +753,8 @@ impl Run {
         glyphs: Vec<Glyph>,
     ) -> Self {
         Self {
+            line,
+            range,
             font,
             style,
             brush,
@@ -722,6 +771,16 @@ impl Run {
     #[must_use]
     pub const fn style(&self) -> &Style {
         &self.style
+    }
+
+    #[must_use]
+    pub const fn line(&self) -> usize {
+        self.line
+    }
+
+    #[must_use]
+    pub const fn range(&self) -> Range {
+        self.range
     }
 
     #[must_use]
@@ -753,6 +812,204 @@ impl Run {
     pub fn glyphs(&self) -> &[Glyph] {
         &self.glyphs
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct InlineMetricFacts {
+    metrics: Metrics,
+    lines: Vec<LineMetricFact>,
+    runs: Vec<RunMetricFact>,
+    inline_boxes: Vec<InlineBoxMetricFact>,
+}
+
+impl InlineMetricFacts {
+    #[must_use]
+    pub fn new(
+        metrics: Metrics,
+        lines: Vec<LineMetricFact>,
+        runs: Vec<RunMetricFact>,
+        inline_boxes: Vec<InlineBoxMetricFact>,
+    ) -> Self {
+        Self {
+            metrics,
+            lines,
+            runs,
+            inline_boxes,
+        }
+    }
+
+    #[must_use]
+    pub const fn metrics(&self) -> Metrics {
+        self.metrics
+    }
+
+    #[must_use]
+    pub fn lines(&self) -> &[LineMetricFact] {
+        &self.lines
+    }
+
+    #[must_use]
+    pub fn runs(&self) -> &[RunMetricFact] {
+        &self.runs
+    }
+
+    #[must_use]
+    pub fn inline_boxes(&self) -> &[InlineBoxMetricFact] {
+        &self.inline_boxes
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LineMetricFact {
+    line: Line,
+}
+
+impl LineMetricFact {
+    #[must_use]
+    pub const fn new(line: Line) -> Self {
+        Self { line }
+    }
+
+    #[must_use]
+    pub const fn line(self) -> Line {
+        self.line
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RunMetricFact {
+    line: usize,
+    range: Range,
+    font_size: f32,
+    baseline: f32,
+    offset: f32,
+    advance: f32,
+}
+
+impl RunMetricFact {
+    #[must_use]
+    pub const fn new(
+        line: usize,
+        range: Range,
+        font_size: f32,
+        baseline: f32,
+        offset: f32,
+        advance: f32,
+    ) -> Self {
+        Self {
+            line,
+            range,
+            font_size,
+            baseline,
+            offset,
+            advance,
+        }
+    }
+
+    #[must_use]
+    pub const fn line(self) -> usize {
+        self.line
+    }
+
+    #[must_use]
+    pub const fn range(self) -> Range {
+        self.range
+    }
+
+    #[must_use]
+    pub const fn font_size(self) -> f32 {
+        self.font_size
+    }
+
+    #[must_use]
+    pub const fn baseline(self) -> f32 {
+        self.baseline
+    }
+
+    #[must_use]
+    pub const fn offset(self) -> f32 {
+        self.offset
+    }
+
+    #[must_use]
+    pub const fn advance(self) -> f32 {
+        self.advance
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InlineBoxMetricFact {
+    id: Id,
+    kind: InlineBoxKind,
+    index: usize,
+    rect: Rect,
+    line: usize,
+    vertical_align: VerticalAlign,
+    baseline_shift: BaselineShiftFact,
+}
+
+impl InlineBoxMetricFact {
+    #[must_use]
+    pub const fn new(
+        id: Id,
+        kind: InlineBoxKind,
+        index: usize,
+        rect: Rect,
+        line: usize,
+        vertical_align: VerticalAlign,
+        baseline_shift: BaselineShiftFact,
+    ) -> Self {
+        Self {
+            id,
+            kind,
+            index,
+            rect,
+            line,
+            vertical_align,
+            baseline_shift,
+        }
+    }
+
+    #[must_use]
+    pub const fn id(self) -> Id {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> InlineBoxKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self.index
+    }
+
+    #[must_use]
+    pub const fn rect(self) -> Rect {
+        self.rect
+    }
+
+    #[must_use]
+    pub const fn line(self) -> usize {
+        self.line
+    }
+
+    #[must_use]
+    pub const fn vertical_align(self) -> VerticalAlign {
+        self.vertical_align
+    }
+
+    #[must_use]
+    pub const fn baseline_shift(self) -> BaselineShiftFact {
+        self.baseline_shift
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BaselineShiftFact {
+    BackendBottomOnBaseline,
+    Requested(BaselineShift),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

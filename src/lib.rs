@@ -29,9 +29,11 @@ pub use id::Id;
 #[cfg(feature = "text-accessibility")]
 pub use layout::Accessibility;
 pub use layout::{
-    Affinity, Cluster, Cursor, CursorGeometry, DecorationKind, DecorationRun, FontData, FontRef,
-    Glyph, Hit, Layout, Line, Metrics, Movement, PaintedSelectionGeometry, PaintedSelectionRect,
-    PositionedInlineBox, Run, RunMetrics, Selection, SelectionGeometry, SelectionRect,
+    Affinity, BaselineShiftFact, Cluster, Cursor, CursorGeometry, DecorationKind, DecorationRun,
+    FontData, FontRef, Glyph, Hit, InlineBoxMetricFact, InlineMetricFacts, Layout, Line,
+    LineMetricFact, Metrics, Movement, PaintedSelectionGeometry, PaintedSelectionRect,
+    PositionedInlineBox, Run, RunMetricFact, RunMetrics, Selection, SelectionGeometry,
+    SelectionRect,
 };
 pub use options::{Alignment, Indent, Options, TextAlignLast, TextOverflow, ValidatedOptions};
 pub use range::{Range, SourcePosition, SourceRange};
