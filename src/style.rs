@@ -140,19 +140,48 @@ impl From<Weight> for FontWeight {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FontWidthRatio(f32);
+
+impl FontWidthRatio {
+    pub fn try_new(value: f32) -> Result<Self> {
+        validate_positive_f32(value, "font width ratio")?;
+        Ok(Self(value))
+    }
+
+    #[must_use]
+    pub const fn get(self) -> f32 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Width {
+    UltraCondensed,
+    ExtraCondensed,
     Condensed,
+    SemiCondensed,
     Normal,
+    SemiExpanded,
     Expanded,
+    ExtraExpanded,
+    UltraExpanded,
+    Ratio(FontWidthRatio),
 }
 
 impl From<Width> for FontWidth {
     fn from(width: Width) -> Self {
         match width {
+            Width::UltraCondensed => Self::ULTRA_CONDENSED,
+            Width::ExtraCondensed => Self::EXTRA_CONDENSED,
             Width::Condensed => Self::CONDENSED,
+            Width::SemiCondensed => Self::SEMI_CONDENSED,
             Width::Normal => Self::NORMAL,
+            Width::SemiExpanded => Self::SEMI_EXPANDED,
             Width::Expanded => Self::EXPANDED,
+            Width::ExtraExpanded => Self::EXTRA_EXPANDED,
+            Width::UltraExpanded => Self::ULTRA_EXPANDED,
+            Width::Ratio(value) => Self::from_ratio(value.get()),
         }
     }
 }
@@ -569,6 +598,7 @@ fn numeric_field(name: &str) -> &'static str {
         "font-size-relative line height" => "font-size-relative line height",
         "absolute line height" => "absolute line height",
         "font weight" => "font weight",
+        "font width ratio" => "font width ratio",
         "letter spacing" => "letter spacing",
         "word spacing" => "word spacing",
         "oblique angle" => "oblique angle",

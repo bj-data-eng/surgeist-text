@@ -275,6 +275,48 @@ fn text_style_support_reports_numeric_font_weight_supported() {
 }
 
 #[test]
+fn font_width_ratio_shapes_and_changes_cache_key() {
+    let mut system = System::default();
+    let condensed = Style {
+        font: Font::new().width(Width::Ratio(
+            FontWidthRatio::try_new(0.875).expect("width is valid"),
+        )),
+        ..Style::default()
+    };
+    let expanded = Style {
+        font: Font::new().width(Width::ExtraExpanded),
+        ..Style::default()
+    };
+
+    let mut first = system.builder("width");
+    first.default_style(condensed);
+    let first = first.build().expect("width ratio should shape");
+
+    let mut second = system.builder("width");
+    second.default_style(expanded);
+    let second = second.build().expect("expanded width should shape");
+
+    assert_ne!(first.key(), second.key());
+}
+
+#[test]
+fn font_width_ratio_rejects_invalid_values() {
+    let zero = FontWidthRatio::try_new(0.0).expect_err("zero width is invalid");
+    let nan = FontWidthRatio::try_new(f32::NAN).expect_err("nan width is invalid");
+
+    assert_eq!(zero.code, ErrorCode::InvalidStyle);
+    assert_eq!(nan.code, ErrorCode::InvalidStyle);
+}
+
+#[test]
+fn text_style_support_reports_expanded_font_stretch_supported() {
+    assert_eq!(
+        TextStyleFeature::ExpandedFontStretch.support(),
+        TextStyleSupport::Supported
+    );
+}
+
+#[test]
 fn rejects_invalid_font_settings() {
     let mut system = System::default();
     let style = Style {
