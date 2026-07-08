@@ -36,7 +36,8 @@ pub use layout::{
 pub use options::{Alignment, Indent, Options, TextAlignLast, TextOverflow, ValidatedOptions};
 pub use range::{Range, SourcePosition, SourceRange};
 pub use source_model::{
-    InlineBox, InlineBoxKind, Source, SourceIdentity, SourceRevision, Span, ValidatedSource,
+    BaselineShift, InlineBox, InlineBoxKind, Source, SourceIdentity, SourceRevision, Span,
+    ValidatedSource, VerticalAlign,
 };
 pub use style::{
     Brush, Decoration, DecorationBrush, DecorationOffset, DecorationOffsetValue,

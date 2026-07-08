@@ -108,9 +108,21 @@ fn validate_source(source: &Source) -> Result<Vec<ValidatedSpan>> {
             style: ValidatedStyle::try_from(span.style.clone())?,
         });
     }
+    let mut inline_box_ids = std::collections::HashSet::new();
     for box_ in &source.boxes {
         range::validate_index(source.text(), box_.index, "inline box index")?;
         validate_inline_box_size(box_.size)?;
+        validate_inline_box_vertical_align(box_.vertical_align)?;
+        if !inline_box_ids.insert(box_.id) {
+            return Err(Error::new(
+                ErrorCode::InvalidStyle,
+                "inline box ids must be unique within a source",
+            )
+            .with_detail(ErrorDetail::UnsupportedCombination {
+                feature: "inline box id",
+                reason: "inline box ids must be unique within a source",
+            }));
+        }
     }
     Ok(span_styles)
 }
@@ -132,6 +144,28 @@ fn validate_inline_box_dimension(value: f32, field: &'static str) -> Result<()> 
             value,
             requirement: NumericRequirement::FiniteNonNegative,
         }));
+    }
+    Ok(())
+}
+
+fn validate_inline_box_vertical_align(vertical_align: VerticalAlign) -> Result<()> {
+    if let VerticalAlign::Shift(shift) = vertical_align {
+        validate_baseline_shift(shift.get())?;
+    }
+    Ok(())
+}
+
+fn validate_baseline_shift(value: f32) -> Result<()> {
+    if !value.is_finite() {
+        return Err(
+            Error::new(ErrorCode::InvalidStyle, "baseline shift must be finite").with_detail(
+                ErrorDetail::InvalidNumericField {
+                    field: "baseline shift",
+                    value,
+                    requirement: NumericRequirement::Finite,
+                },
+            ),
+        );
     }
     Ok(())
 }
@@ -248,6 +282,7 @@ pub struct InlineBox {
     pub(crate) kind: InlineBoxKind,
     pub(crate) index: usize,
     pub(crate) size: Size,
+    pub(crate) vertical_align: VerticalAlign,
 }
 
 impl InlineBox {
@@ -258,7 +293,14 @@ impl InlineBox {
             kind,
             index,
             size,
+            vertical_align: VerticalAlign::Baseline,
         }
+    }
+
+    #[must_use]
+    pub const fn with_vertical_align(mut self, vertical_align: VerticalAlign) -> Self {
+        self.vertical_align = vertical_align;
+        self
     }
 
     #[must_use]
@@ -279,6 +321,54 @@ impl InlineBox {
     #[must_use]
     pub const fn size(self) -> Size {
         self.size
+    }
+
+    #[must_use]
+    pub const fn vertical_align(self) -> VerticalAlign {
+        self.vertical_align
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum VerticalAlign {
+    Baseline,
+    TextTop,
+    TextBottom,
+    Middle,
+    Sub,
+    Super,
+    Shift(BaselineShift),
+}
+
+impl VerticalAlign {
+    #[must_use]
+    pub const fn baseline() -> Self {
+        Self::Baseline
+    }
+
+    pub fn try_shift(value: f32) -> Result<Self> {
+        Ok(Self::Shift(BaselineShift::try_new(value)?))
+    }
+}
+
+impl Default for VerticalAlign {
+    fn default() -> Self {
+        Self::Baseline
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BaselineShift(f32);
+
+impl BaselineShift {
+    pub fn try_new(value: f32) -> Result<Self> {
+        validate_baseline_shift(value)?;
+        Ok(Self(value))
+    }
+
+    #[must_use]
+    pub const fn get(self) -> f32 {
+        self.0
     }
 }
 

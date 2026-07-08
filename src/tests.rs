@@ -893,6 +893,69 @@ fn system_build_rejects_invalid_inline_box_size_before_projection() {
 }
 
 #[test]
+fn inline_box_vertical_align_is_public_and_validated() {
+    let align = VerticalAlign::try_shift(3.5).expect("finite shift is valid");
+    let box_ = InlineBox::new(
+        Id::from_u64(42),
+        InlineBoxKind::InFlow,
+        1,
+        Size::new(8.0, 10.0),
+    )
+    .with_vertical_align(align);
+
+    assert_eq!(box_.vertical_align(), align);
+
+    let mut system = System::default();
+    let mut builder = system.builder("ab");
+    builder.inline_box(box_);
+
+    builder.build().expect("finite aligned inline box is valid");
+}
+
+#[test]
+fn inline_box_baseline_shift_rejects_non_finite_values() {
+    let error = VerticalAlign::try_shift(f32::INFINITY).expect_err("infinite shift is invalid");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+    assert_eq!(
+        error.detail(),
+        Some(&ErrorDetail::InvalidNumericField {
+            field: "baseline shift",
+            value: f32::INFINITY,
+            requirement: NumericRequirement::Finite,
+        })
+    );
+}
+
+#[test]
+fn validated_source_rejects_duplicate_inline_box_ids() {
+    let mut source = Source::new("ab");
+    source.inline_box(InlineBox::new(
+        Id::from_u64(4),
+        InlineBoxKind::InFlow,
+        0,
+        Size::new(4.0, 4.0),
+    ));
+    source.inline_box(InlineBox::new(
+        Id::from_u64(4),
+        InlineBoxKind::InFlow,
+        1,
+        Size::new(5.0, 5.0),
+    ));
+
+    let error = ValidatedSource::try_from(source).expect_err("duplicate IDs are ambiguous");
+
+    assert_eq!(error.code, ErrorCode::InvalidStyle);
+    assert_eq!(
+        error.detail(),
+        Some(&ErrorDetail::UnsupportedCombination {
+            feature: "inline box id",
+            reason: "inline box ids must be unique within a source",
+        })
+    );
+}
+
+#[test]
 fn validated_source_snapshot_rejects_invalid_span_styles_before_cache_keying() {
     let mut source = Source::new("hello");
     source.span(
