@@ -317,6 +317,32 @@ fn text_style_support_reports_expanded_font_stretch_supported() {
 }
 
 #[test]
+fn font_variant_normal_is_default_noop() {
+    assert_eq!(Style::default().font.variant, FontVariant::Normal);
+
+    let style = Style {
+        font: Font::new().variant(FontVariant::Normal),
+        ..Style::default()
+    };
+
+    let validated = ValidatedStyle::try_from(style).expect("normal variant should validate");
+
+    assert_eq!(validated.authored().font.variant, FontVariant::Normal);
+    assert_eq!(
+        TextStyleFeature::FontVariant.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresFontPolicy)
+    );
+}
+
+#[test]
+fn root_must_reject_non_normal_font_variants_before_text() {
+    assert_eq!(
+        TextStyleFeature::FontVariant.support(),
+        TextStyleSupport::Unsupported(UnsupportedTextStyleReason::RequiresFontPolicy)
+    );
+}
+
+#[test]
 fn rejects_invalid_font_settings() {
     let mut system = System::default();
     let style = Style {

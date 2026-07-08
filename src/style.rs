@@ -34,6 +34,7 @@ pub struct Font {
     pub weight: Weight,
     pub width: Width,
     pub slant: Slant,
+    pub variant: FontVariant,
     pub features: Vec<String>,
     pub variations: Vec<String>,
 }
@@ -69,6 +70,12 @@ impl Font {
     }
 
     #[must_use]
+    pub const fn variant(mut self, variant: FontVariant) -> Self {
+        self.variant = variant;
+        self
+    }
+
+    #[must_use]
     pub fn feature(mut self, feature: impl Into<String>) -> Self {
         self.features.push(feature.into());
         self
@@ -88,10 +95,16 @@ impl Default for Font {
             weight: Weight::Normal,
             width: Width::Normal,
             slant: Slant::Normal,
+            variant: FontVariant::Normal,
             features: Vec::new(),
             variations: Vec::new(),
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum FontVariant {
+    Normal,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

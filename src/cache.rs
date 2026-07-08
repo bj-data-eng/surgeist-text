@@ -274,6 +274,7 @@ fn hash_font<H: Hasher>(font: &Font, hasher: &mut H) {
     hash_weight(font.weight, hasher);
     hash_width(font.width, hasher);
     hash_slant(font.slant, hasher);
+    font.variant.hash(hasher);
     font.features.hash(hasher);
     font.variations.hash(hasher);
 }
